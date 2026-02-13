@@ -2,6 +2,7 @@
 # Python bytecode / cache
 # ======================================================
 __pycache__/
+**__pycache__/
 *.py[cod]
 *$py.class
 
@@ -32,9 +33,9 @@ dist/
 # ======================================================
 # Logs, outputs, experiment artifacts
 # ======================================================
-logs/
-outputs/
-results/
+log/
+out/
+result/
 playground/
 *.log
 
