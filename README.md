@@ -2,8 +2,12 @@
 
 ## Setup
 
-Python version: 3.10.13 (arbitrary for now)
-Notice extensive .gitignore - you need to set that up for yourself. I used pyenv, that worked fine.
+_KEEP IN MIND THAT I USE LINUX. THE COMMANDS BELOW MAY OR MAY NOT WORK IN WINDOWS_
+
+---
+
+Python version: 3.10.13 (arbitrary for now)  
+Notice extensive .gitignore - you need to set that up for yourself. I used pyenv, that worked fine. See more below.
 
 ---
 
@@ -11,10 +15,17 @@ Notice extensive .gitignore - you need to set that up for yourself. I used pyenv
 
 - Read the README :)
 - Respect folder architecture, I do not want to pull random logs
+- Please add any python generated files such as caches that I missed to the .gitignore
+- Make sure you update requirements.txt
 
 ---
 
 ## How to run anything.
+
+Create your own venv in the root folder CODE-Reinforcement-Learning.  
+I used pyenv, ChatGPT knows how to use that. (The Tutorial on its website is suboptimal)
+
+---
 
 Once run (obviously with your path)
 
@@ -26,6 +37,7 @@ Then, if the file is ./playground/hello_world.py, run:
     python -m playground.hello_world
 
 This is needed for log()/out() to work. As I have absolutely no idea what I am doing, this surely can be improved.
+
 If you do not want to use my log()/out(), you should be able to simply run
 
     python hello_world
@@ -42,6 +54,8 @@ See below. Everything denoted [local] is in the .gitignore.
     │
     ├── src/                  [shared] core project code
     │ ├── .../                [shared] ...
+    │
+    ├── util/                 [shared] core utility functions
     │
     ├── doc/                  [shared] additional analysis & visualization only
     │
@@ -72,3 +86,25 @@ Use log() and out() from util. Both can be used with or without specifying the e
 
     out("Hello world")
     out("Hello world", "demo.txt")
+
+---
+
+## requirements.txt
+
+Please add any packages you use here, so that others can add them to their venvs:
+
+    numpy==1.24.2          # exactly version 1.24.2
+    pandas>=2.0.0          # any version 2.0.0 or newer
+    scikit-learn<=1.3.0    # version up to 1.3.0
+    matplotlib             # latest version available
+
+To update your venv, then use
+
+    source venv/bin/activate
+    pip install -r requirements.txt
+
+To check installed packages, use
+
+    pip list
+
+---
