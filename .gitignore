@@ -35,6 +35,7 @@ dist/
 logs/
 outputs/
 results/
+playground/
 *.log
 
 # ======================================================
