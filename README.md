@@ -40,24 +40,24 @@ See below. Everything denoted [local] is in the .gitignore.
 
     CODE-Reinforcement-Learning/
     │
-    ├── src/ [shared] core project code
-    │ ├── .../ [shared] ...
+    ├── src/                  [shared] core project code
+    │ ├── .../                [shared] ...
     │
-    ├── doc/ [shared] additional analysis & visualization only
+    ├── doc/                  [shared] additional analysis & visualization only
     │
-    ├── venv/ [local] python virtual environment
+    ├── venv/                 [local] python virtual environment
     │
-    ├── submission*/ [shared] generated, zip-ready hand-ins DO NOT TEST HERE
-    │ └── assignment*/ [shared] self-contained TA executable code DO NOT TEST HERE
+    ├── submissions/          [shared] zip-ready hand-ins  DO NOT TEST HERE
+    │ └── assignment1/        [shared] ...                 DO NOT TEST HERE
     │
-    ├── log/ [local] runtime logs
-    ├── out/ [local] figures, metrics, checkpoints
-    ├── playground/ [local] unrelated python testing
+    ├── log/                  [local] runtime logs
+    ├── out/                  [local] figures, metrics, checkpoints
+    ├── playground/           [local] unrelated python testing
     │
-    ├── .gitignore [shared] excludes local & generated files
-    ├── requirements.txt [shared] pinned runtime dependencies
-    ├── pyproject.toml [shared] tooling & formatting config
-    ├── README.md [shared]
+    ├── .gitignore            [shared] excludes local & generated files
+    ├── requirements.txt      [shared] pinned runtime dependencies
+    ├── pyproject.toml        [shared] tooling & formatting config
+    ├── README.md             [shared]
 
 ---
 
