@@ -77,6 +77,15 @@ See below. Everything denoted [local] is in the .gitignore.
 
 ## Shared utilites
 
+For specifying files, I recommend using
+
+    from util.io_helpers import ROOT_DIR
+
+then using the path relative to that. Avoid absolute paths for portability. Paths relative to the .py file are fine,
+but may break if the file is moved. (for example to the submission folder)
+
+---
+
 Use log() and out() from util. Both can be used with or without specifying the exact file name. Example usage below:
 
     from util.io_helpers import log, out
