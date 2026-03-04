@@ -31,10 +31,9 @@ dist/
 .ipynb_checkpoints/
 
 # ======================================================
-# Logs, outputs, experiment artifacts
+# Logs, experiment artifacts
 # ======================================================
 log/
-out/
 result/
 playground/
 *.log

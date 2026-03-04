@@ -1,12 +1,12 @@
 # CODE-Reinforcement-Learning
 
-## Known Problems
+### Known Problems
 
 - plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
 
 ---
 
-## Human read code
+### Human read code
 
 - Basically nothing at this point. I'll work on that.
 
@@ -25,7 +25,7 @@ Notice extensive .gitignore - you need to set that up for yourself. I used pyenv
 
 ---
 
-## Rules of Engagement
+### Rules of Engagement
 
 - Read the README :)
 - Respect folder architecture, I do not want to pull random logs
@@ -34,7 +34,7 @@ Notice extensive .gitignore - you need to set that up for yourself. I used pyenv
 
 ---
 
-## How to run anything.
+### How to run anything.
 
 Create your own venv in the root folder CODE-Reinforcement-Learning.  
 I used pyenv, ChatGPT knows how to use that. (The Tutorial on its website is suboptimal)
@@ -60,7 +60,7 @@ from playground/ or whereever your file is.
 
 ---
 
-## Intended foulder structure
+### Intended foulder structure
 
 See below. Everything denoted [local] is in the .gitignore.
 
@@ -70,6 +70,8 @@ See below. Everything denoted [local] is in the .gitignore.
     │ ├── .../                [shared] ...
     │
     ├── script/               [shared] entry points
+    │
+    ├── tests/                [shared] standard tests.
     │
     ├── util/                 [shared] core utility functions
     │
@@ -81,7 +83,7 @@ See below. Everything denoted [local] is in the .gitignore.
     │ └── assignment1/        [shared] ...                 DO NOT TEST HERE
     │
     ├── log/                  [local] runtime logs
-    ├── out/                  [local] figures, metrics, checkpoints
+    ├── out/                  [shared] figures, metrics, checkpoints
     ├── playground/           [local] unrelated python testing
     │
     ├── .gitignore            [shared] excludes local & generated files
@@ -91,7 +93,7 @@ See below. Everything denoted [local] is in the .gitignore.
 
 ---
 
-## Shared utilites
+### Shared utilites
 
 For specifying files, I recommend using
 
@@ -114,7 +116,7 @@ Use log() and out() from util. Both can be used with or without specifying the e
 
 ---
 
-## requirements.txt
+### requirements.txt
 
 Please add any packages you use here, so that others can add them to their venvs:
 
