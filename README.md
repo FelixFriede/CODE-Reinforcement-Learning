@@ -55,6 +55,8 @@ See below. Everything denoted [local] is in the .gitignore.
     ├── src/                  [shared] core project code
     │ ├── .../                [shared] ...
     │
+    ├── script/               [shared] entry points
+    │
     ├── util/                 [shared] core utility functions
     │
     ├── doc/                  [shared] additional analysis & visualization only

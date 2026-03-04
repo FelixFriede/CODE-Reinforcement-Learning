@@ -35,7 +35,6 @@ def out(message: str, file_name: str = None):
     if file_name is None:
         file_name = "out.txt"
     file_path = os.path.join(OUT_DIR, file_name)
-    with open(file_path, "w") as f:
+    with open(file_path, "a") as f:
         f.write(message + "\n")
-    print(f"Output written to: {file_name}")
     return file_name

@@ -1,0 +1,55 @@
+## Enviroment
+Use the following for logging and output
+    from util.io_helpers import log, out
+    log("logging message","filename.log")
+    out("output message","filename.txt")
+
+Write new classes in src/ and tests in script/
+There is a src/__init__.py file, so don't worry about finding files there.
+
+
+## Coding Style
+Write the code in a clear, linear, step-by-step style that prioritizes readability and future adaptation over conciseness or cleverness. 
+Prefer explicit helper functions, simple control flow, and modular structure so each step of the logic is easy to understand and modify later.
+
+
+## Bandit class API
+Use the Bandit class directly (usually done via algorithms) via
+    from src.bandit import Bandit
+
+Initialization: 
+    Bandit(n_arms, distribution, means=None, gap=None)
+Parameters
+    n_arms (required) → number of arms
+    distribution (required) → "gaussian" or "bernoulli"
+    means (optional) → list of fixed means
+    gap (optional) → reward gap to enforce descending means
+    Neither means nor gap → random means are generated. Specify means, gaps or none, never both!
+
+Pulling an arm
+    pull(arm_index)
+Returns
+    reward: float
+
+
+## ETCAlgorithm class API
+Use the ETC (Explore-Then-Commit) algorithm via
+    from src.etc import ETCAlgorithm
+
+Initialization
+    ETCAlgorithm(bandit, exploration_rounds)
+Parameters
+    bandit (required): instance of Bandit
+    exploration_rounds (required): int
+
+Executing one step
+    step()
+Returns
+    chosen_arm: int
+    reward: float
+
+Behavior
+    During exploration, arms are pulled in a round-robin order following a_t = t mod K, where K is the number of arms.
+    After exploration, the algorithm commits to the arm with the highest empirical mean.
+    All internal state (time step, pull counts, reward sums, phase transitions) is handled automatically.
+
