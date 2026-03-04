@@ -6,7 +6,6 @@ from util.io_helpers import log, out
 
 
 LOG_FILE = "etc_bulk_test.log"
-OUT_FILE = "etc_bulk_test.txt"
 
 
 def summarize_array(arr, n_preview=8):
@@ -42,13 +41,13 @@ class TestInitShapes:
         assert algo.total_steps == 0
         assert algo.committed is False
 
-        out("TestInitShapes produced data:", OUT_FILE)
-        out(f"exploration_steps_total={algo.exploration_steps_total}", OUT_FILE)
-        out("means summary: " + summarize_array(gang.means), OUT_FILE)
-        out("arm_pull_counts summary: " + summarize_array(algo.arm_pull_counts), OUT_FILE)
-        out("arm_reward_sums summary: " + summarize_array(algo.arm_reward_sums), OUT_FILE)
-        out("committed_arm summary: " + summarize_array(algo.committed_arm), OUT_FILE)
-        out("", OUT_FILE)
+        log("TestInitShapes produced data:", LOG_FILE)
+        log(f"exploration_steps_total={algo.exploration_steps_total}", LOG_FILE)
+        log("means summary: " + summarize_array(gang.means), LOG_FILE)
+        log("arm_pull_counts summary: " + summarize_array(algo.arm_pull_counts), LOG_FILE)
+        log("arm_reward_sums summary: " + summarize_array(algo.arm_reward_sums), LOG_FILE)
+        log("committed_arm summary: " + summarize_array(algo.committed_arm), LOG_FILE)
+        log("", LOG_FILE)
 
 
 class TestExplorationRoundRobin:
@@ -76,10 +75,10 @@ class TestExplorationRoundRobin:
             # Store a tiny sample for output
             chosen_history.append(int(chosen[0]))
 
-        out("TestExplorationRoundRobin produced data:", OUT_FILE)
-        out(f"chosen_history_first_bandit={chosen_history}", OUT_FILE)
-        out("last_rewards_summary: " + summarize_array(rewards), OUT_FILE)
-        out("", OUT_FILE)
+        log("TestExplorationRoundRobin produced data:", LOG_FILE)
+        log(f"chosen_history_first_bandit={chosen_history}", LOG_FILE)
+        log("last_rewards_summary: " + summarize_array(rewards), LOG_FILE)
+        log("", LOG_FILE)
 
 
 class TestExactExplorationCounts:
@@ -103,10 +102,10 @@ class TestExactExplorationCounts:
         assert counts.shape == (n_bandits, n_arms)
         assert np.all(counts == exploration_rounds)
 
-        out("TestExactExplorationCounts produced data:", OUT_FILE)
-        out("counts row0: " + str(counts[0].tolist()), OUT_FILE)
-        out("counts summary: " + summarize_array(counts), OUT_FILE)
-        out("", OUT_FILE)
+        log("TestExactExplorationCounts produced data:", LOG_FILE)
+        log("counts row0: " + str(counts[0].tolist()), LOG_FILE)
+        log("counts summary: " + summarize_array(counts), LOG_FILE)
+        log("", LOG_FILE)
 
 
 class TestCommitmentAndStickiness:
@@ -139,12 +138,12 @@ class TestCommitmentAndStickiness:
             chosen_t, rewards_t = algo.step()
             assert np.array_equal(chosen_t, algo.committed_arm)
 
-        out("TestCommitmentAndStickiness produced data:", OUT_FILE)
-        out("committed_arm summary: " + summarize_array(algo.committed_arm), OUT_FILE)
-        out("chosen1 preview: " + str(chosen1[:10].tolist()), OUT_FILE)
-        out("rewards1 summary: " + summarize_array(rewards1), OUT_FILE)
-        out("last_rewards summary: " + summarize_array(rewards_t), OUT_FILE)
-        out("", OUT_FILE)
+        log("TestCommitmentAndStickiness produced data:", LOG_FILE)
+        log("committed_arm summary: " + summarize_array(algo.committed_arm), LOG_FILE)
+        log("chosen1 preview: " + str(chosen1[:10].tolist()), LOG_FILE)
+        log("rewards1 summary: " + summarize_array(rewards1), LOG_FILE)
+        log("last_rewards summary: " + summarize_array(rewards_t), LOG_FILE)
+        log("", LOG_FILE)
 
 
 class TestStatisticalSanityBestArmHitRateGaussian:
@@ -175,11 +174,11 @@ class TestStatisticalSanityBestArmHitRateGaussian:
         # This is intentionally not too strict to avoid flaky tests across RNG/platforms.
         assert hit_rate > 0.20
 
-        out("TestStatisticalSanityBestArmHitRateGaussian produced data:", OUT_FILE)
-        out("true_best summary: " + summarize_array(true_best), OUT_FILE)
-        out("committed summary: " + summarize_array(committed), OUT_FILE)
-        out(f"hit_rate={hit_rate:.4f} (random baseline={1.0/n_arms:.4f})", OUT_FILE)
-        out("", OUT_FILE)
+        log("TestStatisticalSanityBestArmHitRateGaussian produced data:", LOG_FILE)
+        log("true_best summary: " + summarize_array(true_best), LOG_FILE)
+        log("committed summary: " + summarize_array(committed), LOG_FILE)
+        log(f"hit_rate={hit_rate:.4f} (random baseline={1.0/n_arms:.4f})", LOG_FILE)
+        log("", LOG_FILE)
 
 
 def run_all_tests():
@@ -195,12 +194,12 @@ def run_all_tests():
         name = test.__class__.__name__
         try:
             test.run()
-            out(f"{name}: PASS", OUT_FILE)
+            log(f"{name}: PASS", LOG_FILE)
         except Exception as e:
-            out(f"{name}: FAIL -> {type(e).__name__}: {e}", OUT_FILE)
+            log(f"{name}: FAIL -> {type(e).__name__}: {e}", LOG_FILE)
             raise
 
-    out("All ETCBulkAlgorithm tests completed successfully.", OUT_FILE)
+    log("All ETCBulkAlgorithm tests completed successfully.", LOG_FILE)
 
 
 if __name__ == "__main__":

@@ -106,9 +106,7 @@ class Bandit:
 
         return reward
     
-
-import numpy as np
-
+    
 
 class Gang_of_Bandits:
     """
@@ -120,7 +118,7 @@ class Gang_of_Bandits:
       - arm_index: array-like shape (n_bandits,) -> each bandit pulls its own arm
     """
 
-    def __init__(self, n_bandits, n_arms, distribution):
+    def __init__(self, n_bandits, n_arms, distribution, means=None):
         self.n_bandits = int(n_bandits)
         self.n_arms = int(n_arms)
         self.distribution = distribution
@@ -132,7 +130,11 @@ class Gang_of_Bandits:
         if distribution not in ("gaussian", "bernoulli"):
             raise ValueError("distribution must be 'gaussian' or 'bernoulli'")
 
-        self.means = self._init_random_means()  # (n_bandits, n_arms)
+        # ---- initialize means ----
+        if means is None:
+            self.means = self._init_random_means()
+        else:
+            self.means = self._init_given_means(means)
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -140,19 +142,36 @@ class Gang_of_Bandits:
 
     def _init_random_means(self):
         """
-        Initialize per-bandit means and sort arms *within each bandit*.
+        Initialize random per-bandit means and sort arms *within each bandit*.
 
         Sorting is descending (best arm at index 0), which makes arm indices
-        comparable across runs for plot (c): arm 0 ~ best, arm 1 ~ 2nd best, etc.
+        comparable across runs for plotting.
         """
         if self.distribution == "gaussian":
             means = np.random.randn(self.n_bandits, self.n_arms)
         else:  # bernoulli
             means = np.random.uniform(0.0, 1.0, size=(self.n_bandits, self.n_arms))
 
-        # Sort arms within each bandit by mean, best -> worst
         means.sort(axis=1)
-        means = means[:, ::-1]
+        return means[:, ::-1]
+
+    def _init_given_means(self, means):
+        """
+        Initialize using user-provided means.
+        """
+        means = np.asarray(means, dtype=float)
+
+        if means.shape != (self.n_bandits, self.n_arms):
+            raise ValueError(
+                f"means must have shape ({self.n_bandits}, {self.n_arms})"
+            )
+
+        if self.distribution == "bernoulli":
+            if (means < 0).any() or (means > 1).any():
+                raise ValueError("Bernoulli means must lie in [0,1]")
+
+        # sort arms descending so arm 0 is best
+        means = np.sort(means, axis=1)[:, ::-1]
 
         return means
 
@@ -181,18 +200,16 @@ class Gang_of_Bandits:
             if a < 0 or a >= self.n_arms:
                 raise IndexError("Invalid arm index")
 
-            mu = self.means[:, a]  # shape (n_bandits,)
+            mu = self.means[:, a]
 
             if self.distribution == "gaussian":
-                # Vectorized: one normal draw per bandit
                 return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)
 
-            # bernoulli: vectorized with per-bandit probabilities
             return (np.random.random(self.n_bandits) < mu).astype(np.int8)
-
 
         # General path: one arm per bandit
         arms = np.asarray(arm_index)
+
         if arms.shape != (self.n_bandits,):
             raise ValueError(f"arm_index must be an int or shape ({self.n_bandits},)")
 
@@ -200,7 +217,7 @@ class Gang_of_Bandits:
             raise IndexError("Invalid arm index in arm_index array")
 
         rows = np.arange(self.n_bandits)
-        mu = self.means[rows, arms]  # gather per-bandit chosen-arm mean; shape (n_bandits,)
+        mu = self.means[rows, arms]
 
         if self.distribution == "gaussian":
             return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)

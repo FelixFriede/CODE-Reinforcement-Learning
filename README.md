@@ -1,6 +1,20 @@
 # CODE-Reinforcement-Learning
 
-## Setup
+## Known Problems
+
+- plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
+
+---
+
+## Human read code
+
+- Basically nothing at this point. I'll work on that.
+
+---
+
+---
+
+# Setup
 
 _KEEP IN MIND THAT I USE LINUX. THE COMMANDS BELOW MAY OR MAY NOT WORK IN WINDOWS_
 

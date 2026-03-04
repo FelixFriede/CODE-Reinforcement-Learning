@@ -13,43 +13,384 @@ Write the code in a clear, linear, step-by-step style that prioritizes readabili
 Prefer explicit helper functions, simple control flow, and modular structure so each step of the logic is easy to understand and modify later.
 
 
-## Bandit class API
-Use the Bandit class directly (usually done via algorithms) via
-    from src.bandit import Bandit
+## Gang_of_Bandits class API
+Bulk version of Bandit for running many bandits in parallel.
 
-Initialization: 
-    Bandit(n_arms, distribution, means=None, gap=None)
-Parameters
-    n_arms (required) → number of arms
-    distribution (required) → "gaussian" or "bernoulli"
-    means (optional) → list of fixed means
-    gap (optional) → reward gap to enforce descending means
-    Neither means nor gap → random means are generated. Specify means, gaps or none, never both!
-
-Pulling an arm
-    pull(arm_index)
-Returns
-    reward: float
-
-
-## ETCAlgorithm class API
-Use the ETC (Explore-Then-Commit) algorithm via
-    from src.etc import ETCAlgorithm
+Use via
+    from src.bandits import Gang_of_Bandits
 
 Initialization
-    ETCAlgorithm(bandit, exploration_rounds)
+    Gang_of_Bandits(n_bandits, n_arms, distribution, means=None, gap=None)
+
 Parameters
-    bandit (required): instance of Bandit
+    n_bandits (required) → number of independent bandits simulated in parallel
+    n_arms (required) → number of arms
+    distribution (required) → "gaussian" or "bernoulli"
+    means (optional) → matrix of fixed means (n_bandits x n_arms)
+    gap (optional) → reward gap to enforce descending means
+    Neither means nor gap → random means generated
+
+Pulling arms
+    bulk_pull(arm_index)
+
+Parameters
+    arm_index → either:
+        int (same arm for all bandits)
+        np.ndarray shape (n_bandits,) (one arm per bandit)
+
+Returns
+    rewards: np.ndarray shape (n_bandits,)
+
+
+## ETCBulkAlgorithm class API
+Bulk Explore-Then-Commit algorithm.
+
+Use via
+    from src.etc_bulk import ETCBulkAlgorithm
+
+Initialization
+    ETCBulkAlgorithm(bandit, exploration_rounds)
+
+Parameters
+    bandit (required): instance of Gang_of_Bandits
     exploration_rounds (required): int
 
 Executing one step
     step()
+
+Returns
+    chosen_arms: np.ndarray shape (n_bandits,)
+    rewards: np.ndarray shape (n_bandits,)
+
+Behavior
+    During exploration, arms are pulled round-robin.
+    After exploration, each bandit commits to its best empirical arm.
+
+
+## GreedyAlgorithm class API
+Pure greedy algorithm.
+
+Use via
+    from src.greedy import GreedyAlgorithm
+
+Initialization
+    GreedyAlgorithm(bandit)
+
+Parameters
+    bandit (required): instance of Bandit
+
+Executing one step
+    step()
+
 Returns
     chosen_arm: int
     reward: float
 
 Behavior
-    During exploration, arms are pulled in a round-robin order following a_t = t mod K, where K is the number of arms.
-    After exploration, the algorithm commits to the arm with the highest empirical mean.
-    All internal state (time step, pull counts, reward sums, phase transitions) is handled automatically.
+    Always selects arm with highest empirical mean.
 
+
+## GreedyBulkAlgorithm class API
+Bulk greedy algorithm.
+
+Use via
+    from src.greedy_bulk import GreedyBulkAlgorithm
+
+Initialization
+    GreedyBulkAlgorithm(bandit)
+
+Parameters
+    bandit (required): instance of Gang_of_Bandits
+
+Executing one step
+    step()
+
+Returns
+    chosen_arms: np.ndarray (n_bandits,)
+    rewards: np.ndarray (n_bandits,)
+
+
+## EpsilonGreedyFixedAlgorithm class API
+ε-greedy with fixed exploration probability.
+
+Use via
+    from src.greedy import EpsilonGreedyFixedAlgorithm
+
+Initialization
+    EpsilonGreedyFixedAlgorithm(bandit, epsilon)
+
+Parameters
+    bandit (required): Bandit
+    epsilon (required): float in [0,1]
+
+Executing one step
+    step()
+
+Returns
+    chosen_arm: int
+    reward: float
+
+Behavior
+    With probability ε choose random arm, otherwise greedy arm.
+
+
+## EpsilonGreedyFixedBulkAlgorithm class API
+Bulk fixed ε-greedy.
+
+Use via
+    from src.greedy_bulk import EpsilonGreedyFixedBulkAlgorithm
+
+Initialization
+    EpsilonGreedyFixedBulkAlgorithm(bandit, epsilon)
+
+Parameters
+    bandit: Gang_of_Bandits
+    epsilon: float
+
+Executing one step
+    step()
+
+Returns
+    chosen_arms: np.ndarray (n_bandits,)
+    rewards: np.ndarray (n_bandits,)
+
+
+## EpsilonGreedyDecreasingAlgorithm class API
+ε-greedy with decreasing exploration.
+
+Use via
+    from src.greedy import EpsilonGreedyDecreasingAlgorithm
+
+Initialization
+    EpsilonGreedyDecreasingAlgorithm(bandit, epsilon0)
+
+Parameters
+    bandit: Bandit
+    epsilon0: initial exploration parameter
+
+Executing one step
+    step()
+
+Returns
+    chosen_arm: int
+    reward: float
+
+Behavior
+    ε_t = min(1, epsilon0 / (t+1))
+
+
+## EpsilonGreedyDecreasingBulkAlgorithm class API
+Bulk decreasing ε-greedy.
+
+Use via
+    from src.greedy_bulk import EpsilonGreedyDecreasingBulkAlgorithm
+
+Initialization
+    EpsilonGreedyDecreasingBulkAlgorithm(bandit, epsilon0)
+
+Parameters
+    bandit: Gang_of_Bandits
+    epsilon0: float
+
+Executing one step
+    step()
+
+Returns
+    chosen_arms: np.ndarray (n_bandits,)
+    rewards: np.ndarray (n_bandits,)
+
+
+## UCBAlgorithm class API
+Upper Confidence Bound algorithm for bounded rewards.
+
+Use via
+    from src.ucb import UCBAlgorithm
+
+Initialization
+    UCBAlgorithm(bandit, delta)
+
+Parameters
+    bandit: Bandit
+    delta: confidence parameter
+
+Executing one step
+    step()
+
+Returns
+    chosen_arm: int
+    reward: float
+
+
+## UCBulkAlgorithm class API
+Bulk UCB algorithm.
+
+Use via
+    from src.ucb_bulk import UCBulkAlgorithm
+
+Initialization
+    UCBulkAlgorithm(bandit, delta)
+
+Parameters
+    bandit: Gang_of_Bandits
+    delta: float
+
+Executing one step
+    step()
+
+Returns
+    chosen_arms: np.ndarray (n_bandits,)
+    rewards: np.ndarray (n_bandits,)
+
+
+## UCBSubGaussianAlgorithm class API
+UCB for σ-subgaussian rewards.
+
+Use via
+    from src.ucb import UCBSubGaussianAlgorithm
+
+Initialization
+    UCBSubGaussianAlgorithm(bandit, delta, sigma)
+
+Parameters
+    bandit: Bandit
+    delta: confidence parameter
+    sigma: subgaussian scale
+
+
+## UCBSubGaussianBulkAlgorithm class API
+Bulk σ-subgaussian UCB.
+
+Use via
+    from src.ucb_bulk import UCBSubGaussianBulkAlgorithm
+
+Initialization
+    UCBSubGaussianBulkAlgorithm(bandit, delta, sigma)
+
+Parameters
+    bandit: Gang_of_Bandits
+    delta: float
+    sigma: float
+
+
+## BoltzmannExplorationAlgorithm class API
+Softmax/Boltzmann exploration.
+
+Use via
+    from src.boltzmann import BoltzmannExplorationAlgorithm
+
+Initialization
+    BoltzmannExplorationAlgorithm(bandit, theta)
+
+Parameters
+    bandit: Bandit
+    theta: temperature parameter
+
+
+## BoltzmannExplorationBulkAlgorithm class API
+Bulk Boltzmann exploration.
+
+Use via
+    from src.boltzmann_bulk import BoltzmannExplorationBulkAlgorithm
+
+Initialization
+    BoltzmannExplorationBulkAlgorithm(bandit, theta)
+
+Parameters
+    bandit: Gang_of_Bandits
+    theta: float
+
+
+## BoltzmannGumbelTrickAlgorithm class API
+Boltzmann exploration via Gumbel trick.
+
+Use via
+    from src.boltzmann import BoltzmannGumbelTrickAlgorithm
+
+
+## BoltzmannGumbelTrickBulkAlgorithm class API
+Bulk Gumbel trick Boltzmann.
+
+Use via
+    from src.boltzmann_bulk import BoltzmannGumbelTrickBulkAlgorithm
+
+
+## BoltzmannArbitraryNoiseAlgorithm class API
+Boltzmann exploration with arbitrary noise.
+
+Use via
+    from src.boltzmann import BoltzmannArbitraryNoiseAlgorithm
+
+Initialization
+    BoltzmannArbitraryNoiseAlgorithm(bandit, theta, noise, noise_params=None)
+
+
+## BoltzmannArbitraryNoiseBulkAlgorithm class API
+Bulk arbitrary-noise Boltzmann.
+
+Use via
+    from src.boltzmann_bulk import BoltzmannArbitraryNoiseBulkAlgorithm
+
+
+## GumbelScaledBonusAlgorithm class API
+Gumbel exploration bonus algorithm.
+
+Use via
+    from src.boltzmann import GumbelScaledBonusAlgorithm
+
+Initialization
+    GumbelScaledBonusAlgorithm(bandit, C)
+
+
+## GumbelScaledBonusBulkAlgorithm class API
+Bulk Gumbel scaled bonus.
+
+Use via
+    from src.boltzmann_bulk import GumbelScaledBonusBulkAlgorithm
+
+
+## PolicyGradientAlgorithm class API
+REINFORCE policy gradient with softmax policy.
+
+Use via
+    from src.policy_gradient import PolicyGradientAlgorithm
+
+Initialization
+    PolicyGradientAlgorithm(bandit, alpha)
+
+Parameters
+    bandit: Bandit
+    alpha: learning rate
+
+
+## PolicyGradientBulkAlgorithm class API
+Bulk REINFORCE algorithm.
+
+Use via
+    from src.policy_gradient_bulk import PolicyGradientBulkAlgorithm
+
+Initialization
+    PolicyGradientBulkAlgorithm(bandit, alpha)
+
+Parameters
+    bandit: Gang_of_Bandits
+    alpha: float
+
+
+## PolicyGradientBaselineAlgorithm class API
+REINFORCE with baseline.
+
+Use via
+    from src.policy_gradient import PolicyGradientBaselineAlgorithm
+
+Initialization
+    PolicyGradientBaselineAlgorithm(bandit, alpha)
+
+
+## PolicyGradientBaselineBulkAlgorithm class API
+Bulk REINFORCE with baseline.
+
+Use via
+    from src.policy_gradient_bulk import PolicyGradientBaselineBulkAlgorithm
+
+Initialization
+    PolicyGradientBaselineBulkAlgorithm(bandit, alpha)

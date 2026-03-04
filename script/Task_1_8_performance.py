@@ -9,7 +9,8 @@ from util.io_helpers import OUT_DIR
 
 
 def _mean_var(x, axis=0):
-    """Return (mean, var) along axis using population variance."""
+    # Return (mean, var) along axis using population variance.
+
     x = np.asarray(x)
     return x.mean(axis=axis), x.var(axis=axis)
 
@@ -129,17 +130,12 @@ def run_bulk_etc_experiment(
 # -----------------------------
 
 def get_experiment_out_dir(result):
-    """
-    Create and return an output directory for the experiment.
-    """
+    # Create and return an output directory for the experiment.
+
     m = result["exploration_rounds"]
     exp_dir = os.path.join(OUT_DIR, f"etc_m{m}")
     os.makedirs(exp_dir, exist_ok=True)
     return exp_dir
-
-def _ensure_out_dir():
-    os.makedirs(OUT_DIR, exist_ok=True)
-
 
 def plot_regret_over_time(result):
     exp_dir = get_experiment_out_dir(result)
@@ -214,17 +210,110 @@ def plot_arm_choice_probabilities_over_time(result):
 
     plt.savefig(os.path.join(exp_dir, "arm_probabilities.png"), dpi=150)
     plt.close()
-    
 
+
+def plot_cumulative_regret_comparison(results):
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    plt.figure()
+
+    for res in results:
+        t = np.arange(res["n_steps"])
+        m = res["exploration_rounds"]
+
+        plt.plot(
+            t,
+            res["cum_regret_mean"],
+            label=f"m={m}"
+        )
+
+    plt.xlabel("t")
+    plt.ylabel("Average cumulative regret")
+    plt.title("ETC cumulative regret comparison")
+    plt.legend()
+
+    file_path = os.path.join(OUT_DIR, "etc_regret_comparison.png")
+    plt.savefig(file_path, dpi=150)
+    plt.close()
+
+
+def plot_correct_action_rate_comparison(results):
+ 
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # sort results by exploration rounds descending
+    results_sorted = sorted(results, key=lambda r: r["exploration_rounds"], reverse=True)
+
+    plt.figure()
+
+    for res in results_sorted:
+        t = np.arange(res["n_steps"])
+        m = res["exploration_rounds"]
+
+        plt.plot(
+            t,
+            res["correct_rate_mean"],
+            label=f"m={m}"
+        )
+
+    plt.xlabel("t")
+    plt.ylabel("Correct action rate")
+    plt.title("ETC correct action rate comparison")
+    plt.legend()
+
+    file_path = os.path.join(OUT_DIR, "etc_correct_action_rate_comparison.png")
+    plt.savefig(file_path, dpi=150)
+    plt.close()
+
+def plot_instant_regret_comparison(results):
+    
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # sort results by exploration rounds descending
+    results_sorted = sorted(results, key=lambda r: r["exploration_rounds"], reverse=True)
+
+    plt.figure()
+
+    for res in results_sorted:
+        t = np.arange(res["n_steps"])
+        m = res["exploration_rounds"]
+
+        plt.plot(t, res["inst_regret_mean"], label=f"m={m}")
+
+    plt.xlabel("t")
+    plt.ylabel("Average instant regret")
+    plt.title("ETC instant regret comparison")
+    plt.legend()
+
+    file_path = os.path.join(OUT_DIR, "etc_instant_regret_comparison.png")
+    plt.savefig(file_path, dpi=150)
+    plt.close()
+    
 def main():
-    ms = [1,5,10,25,50,100,250]
+    ms = [3,5,10,15,20,25,30,50,100]
+
+    results = []
+
     for m in ms:
-        res = run_bulk_etc_experiment(exploration_rounds=m, n_steps=10_000, N=1_000, n_arms=10, seed=123)
-        plot_regret_over_time(res)
-        plot_correct_action_rate_over_time(res)
+        res = run_bulk_etc_experiment(
+            exploration_rounds=m,
+            n_steps=10_000,
+            N=1_000,
+            n_arms=10
+        )
+
+        print(f"\r\033[KPlotting ETC experiment | gang size N={1000} | exploration rounds m={m} | steps n=10000",end="")
+
+        results.append(res)
+
         plot_ranked_estimates_vs_true_over_time(res)
         plot_arm_choice_probabilities_over_time(res)
-        print(f"\rFinished ETC experiment | gang size N={1_000} | exploration rounds m={m} | steps n={10_000}")
+
+        print(f"\r\033[KFinished ETC experiment | gang size N={1000} | exploration rounds m={m} | steps n={10000}")
+
+    plot_cumulative_regret_comparison(results)
+    plot_instant_regret_comparison(results)
+    plot_correct_action_rate_comparison(results)
 
 if __name__ == "__main__":
     main()
