@@ -36,7 +36,10 @@ dist/
 log/
 result/
 playground/
+tests/
 *.log
+*.npz
+*.json
 
 # ======================================================
 # Temporary files

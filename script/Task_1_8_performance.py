@@ -1,12 +1,21 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import os
+# script/Task_1_8_performance.py
 
+# general
+import numpy as np
+import sys, os, json
+from typing import Any
+
+# bandit & algorithm
 from src.bandits import Gang_of_Bandits
 from src.etc import ETCBulkAlgorithm
+
+# global utilities
 from util.io_helpers import OUT_DIR
 
+
+# ----------------------
+# local utilities
+# ----------------------
 
 def _mean_var(x, axis=0):
     # Return (mean, var) along axis using population variance.
@@ -14,6 +23,76 @@ def _mean_var(x, axis=0):
     x = np.asarray(x)
     return x.mean(axis=axis), x.var(axis=axis)
 
+
+# ----------------------
+# data saving helpers
+# ----------------------
+
+def get_experiment_out_dir(result: dict[str, Any]) -> str:
+    m = result["exploration_rounds"]
+    exp_dir = os.path.join(OUT_DIR, "ex1_etc", f"etc_m{m}")
+    os.makedirs(exp_dir, exist_ok=True)
+    return exp_dir
+
+
+def _is_np_array_like(x: Any) -> bool:
+    return isinstance(x, np.ndarray)
+
+
+def _to_jsonable(x: Any):
+    # keep meta small + robust (no giant arrays here)
+    if isinstance(x, (str, int, float, bool)) or x is None:
+        return x
+    if isinstance(x, (np.integer,)):
+        return int(x)
+    if isinstance(x, (np.floating,)):
+        return float(x)
+    if isinstance(x, (np.bool_,)):
+        return bool(x)
+    if isinstance(x, (list, tuple)):
+        return [_to_jsonable(v) for v in x]
+    if isinstance(x, dict):
+        return {str(k): _to_jsonable(v) for k, v in x.items()}
+    # fallback: string repr for odd stuff (e.g. enums)
+    return str(x)
+
+
+def split_res(res: dict[str, Any]) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    arrays: dict[str, np.ndarray] = {}
+    meta: dict[str, Any] = {}
+    for k, v in res.items():
+        if _is_np_array_like(v):
+            arrays[k] = v
+        else:
+            meta[k] = _to_jsonable(v)
+    return arrays, meta
+
+
+def save_run(exp_dir: str, res: dict[str, Any]) -> None:
+    arrays, meta = split_res(res)
+
+    # Arrays go to a compressed NPZ
+    np.savez_compressed(os.path.join(exp_dir, "result_arrays.npz"), **arrays)
+
+    # Meta goes to small JSON
+    with open(os.path.join(exp_dir, "result_meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+    # Convenience pointer for render script
+    with open(os.path.join(exp_dir, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "arrays": "result_arrays.npz",
+                "meta": "result_meta.json",
+            },
+            f,
+            indent=2,
+        )
+
+
+# ----------------------
+# core
+# ----------------------
 
 def run_bulk_etc_experiment(
     exploration_rounds: int,
@@ -68,7 +147,7 @@ def run_bulk_etc_experiment(
     cum_regret_per_run = np.zeros(N, dtype=float)
 
     for t in range(n_steps):
-        if t % 250 == 0:
+        if t % 1000 == 0:
             sys.stdout.write(f"\rRunning  ETC experiment | gang size N={N} | exploration rounds m={exploration_rounds} | step {t}/{n_steps}")
             sys.stdout.flush()
 
@@ -125,195 +204,39 @@ def run_bulk_etc_experiment(
     }
 
 
-# -----------------------------
-# Plotting helpers
-# -----------------------------
+# ----------------------
+# main
+# ----------------------
 
-def get_experiment_out_dir(result):
-    # Create and return an output directory for the experiment.
-
-    m = result["exploration_rounds"]
-    exp_dir = os.path.join(OUT_DIR, f"etc_m{m}")
-    os.makedirs(exp_dir, exist_ok=True)
-    return exp_dir
-
-def plot_regret_over_time(result):
-    exp_dir = get_experiment_out_dir(result)
-    t = np.arange(result["n_steps"])
-
-    plt.figure()
-    plt.plot(t, result["cum_regret_mean"])
-    plt.xlabel("t")
-    plt.ylabel("Average cumulative regret")
-    plt.title(f"ETC cumulative regret (m={result['exploration_rounds']})")
-
-    plt.savefig(os.path.join(exp_dir, "regret_cumulative.png"), dpi=150)
-    plt.close()
-
-    plt.figure()
-    plt.plot(t, result["inst_regret_mean"])
-    plt.xlabel("t")
-    plt.ylabel("Average instant regret")
-    plt.title(f"ETC instant regret (m={result['exploration_rounds']})")
-
-    plt.savefig(os.path.join(exp_dir, "regret_instant.png"), dpi=150)
-    plt.close()
-
-def plot_correct_action_rate_over_time(result):
-    exp_dir = get_experiment_out_dir(result)
-    t = np.arange(result["n_steps"])
-
-    plt.figure()
-    plt.plot(t, result["correct_rate_mean"])
-    plt.xlabel("t")
-    plt.ylabel("Correct action rate")
-    plt.title(f"ETC correct action rate (m={result['exploration_rounds']})")
-    plt.ylim(-0.05, 1.05)
-
-    plt.savefig(os.path.join(exp_dir, "correct_action_rate.png"), dpi=150)
-    plt.close()
-
-def plot_ranked_estimates_vs_true_over_time(result, ranks_to_plot=(0, 1, 2, 9)):
-    exp_dir = get_experiment_out_dir(result)
-
-    t = np.arange(result["n_steps"])
-    true_ranked = result["true_means_ranked_mean"]
-
-    plt.figure()
-
-    for r in ranks_to_plot:
-        plt.plot(t, result["est_ranked_mean"][:, r], label=f"estimate rank {r+1}")
-        plt.hlines(true_ranked[r], 0, result["n_steps"] - 1, linestyles="dashed")
-
-    plt.xlabel("t")
-    plt.ylabel("Mean estimate")
-    plt.title(f"ETC ranked estimates vs true means (m={result['exploration_rounds']})")
-    plt.legend()
-
-    plt.savefig(os.path.join(exp_dir, "ranked_estimates.png"), dpi=150)
-    plt.close()
-
-def plot_arm_choice_probabilities_over_time(result):
-    exp_dir = get_experiment_out_dir(result)
-    t = np.arange(result["n_steps"])
-
-    plt.figure()
-
-    for a in range(result["n_arms"]):
-        plt.plot(t, result["arm_prob_mean"][:, a], label=f"arm {a}")
-
-    plt.xlabel("t")
-    plt.ylabel("P(choose arm)")
-    plt.title(f"ETC arm choice probabilities (m={result['exploration_rounds']})")
-    plt.legend(ncol=2)
-    plt.ylim(-0.05, 1.05)
-
-    plt.savefig(os.path.join(exp_dir, "arm_probabilities.png"), dpi=150)
-    plt.close()
-
-
-def plot_cumulative_regret_comparison(results):
-    os.makedirs(OUT_DIR, exist_ok=True)
-
-    plt.figure()
-
-    for res in results:
-        t = np.arange(res["n_steps"])
-        m = res["exploration_rounds"]
-
-        plt.plot(
-            t,
-            res["cum_regret_mean"],
-            label=f"m={m}"
-        )
-
-    plt.xlabel("t")
-    plt.ylabel("Average cumulative regret")
-    plt.title("ETC cumulative regret comparison")
-    plt.legend()
-
-    file_path = os.path.join(OUT_DIR, "etc_regret_comparison.png")
-    plt.savefig(file_path, dpi=150)
-    plt.close()
-
-
-def plot_correct_action_rate_comparison(results):
- 
-    os.makedirs(OUT_DIR, exist_ok=True)
-
-    # sort results by exploration rounds descending
-    results_sorted = sorted(results, key=lambda r: r["exploration_rounds"], reverse=True)
-
-    plt.figure()
-
-    for res in results_sorted:
-        t = np.arange(res["n_steps"])
-        m = res["exploration_rounds"]
-
-        plt.plot(
-            t,
-            res["correct_rate_mean"],
-            label=f"m={m}"
-        )
-
-    plt.xlabel("t")
-    plt.ylabel("Correct action rate")
-    plt.title("ETC correct action rate comparison")
-    plt.legend()
-
-    file_path = os.path.join(OUT_DIR, "etc_correct_action_rate_comparison.png")
-    plt.savefig(file_path, dpi=150)
-    plt.close()
-
-def plot_instant_regret_comparison(results):
-    
-    os.makedirs(OUT_DIR, exist_ok=True)
-
-    # sort results by exploration rounds descending
-    results_sorted = sorted(results, key=lambda r: r["exploration_rounds"], reverse=True)
-
-    plt.figure()
-
-    for res in results_sorted:
-        t = np.arange(res["n_steps"])
-        m = res["exploration_rounds"]
-
-        plt.plot(t, res["inst_regret_mean"], label=f"m={m}")
-
-    plt.xlabel("t")
-    plt.ylabel("Average instant regret")
-    plt.title("ETC instant regret comparison")
-    plt.legend()
-
-    file_path = os.path.join(OUT_DIR, "etc_instant_regret_comparison.png")
-    plt.savefig(file_path, dpi=150)
-    plt.close()
-    
 def main():
-    ms = [3,5,10,15,20,25,30,50,100]
+    # ms = [5,10,15,20,25,30,35,40,45,50]
+    ms = [12,13,14,15,16,17,18,19,20,21,22]
 
-    results = []
+    sweep_dir = os.path.join(OUT_DIR, "ex1_etc")
+    os.makedirs(sweep_dir, exist_ok=True)
+
+    index = [] 
 
     for m in ms:
         res = run_bulk_etc_experiment(
             exploration_rounds=m,
             n_steps=10_000,
             N=1_000,
-            n_arms=10
+            n_arms=10,
         )
 
-        print(f"\r\033[KPlotting ETC experiment | gang size N={1000} | exploration rounds m={m} | steps n=10000",end="")
+        exp_dir = get_experiment_out_dir(res)
+        save_run(exp_dir, res)
 
-        results.append(res)
+        index.append({"m": int(m), "dir": os.path.relpath(exp_dir, sweep_dir)})
 
-        plot_ranked_estimates_vs_true_over_time(res)
-        plot_arm_choice_probabilities_over_time(res)
+        print(
+            f"\r\033[KSaved ETC experiment | N=1000 | m={m} | n_steps=10000 -> {exp_dir}"
+        )
 
-        print(f"\r\033[KFinished ETC experiment | gang size N={1000} | exploration rounds m={m} | steps n={10000}")
+    with open(os.path.join(sweep_dir, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=2)
 
-    plot_cumulative_regret_comparison(results)
-    plot_instant_regret_comparison(results)
-    plot_correct_action_rate_comparison(results)
 
 if __name__ == "__main__":
     main()

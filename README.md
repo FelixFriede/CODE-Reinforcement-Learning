@@ -1,43 +1,70 @@
 # CODE-Reinforcement-Learning
 
+    CODE-Reinforcement-Learning/
+    │
+    ├── src/                  [shared] core project code
+    ├── script/               [shared] entry points
+    ├── util/                 [shared] core utility functions
+    ├── out/                  [shared] figures, metrics, data
+    ├── doc/                  [shared] additional analysis & visualization
+    │
+    ├── venv/                 [local] python virtual environment
+    ├── log/                  [local] runtime logs
+    ├── playground/           [local] unrelated python testing
+    ├── tests/                [local] standard tests.
+    │
+    ├── .gitignore            [shared] excludes local & generated files
+    ├── requirements.txt      [shared] pinned runtime dependencies
+    ├── prompts.txt           [shared] API and coding style information for AI agents.
+    ├── README.md             [shared]
+
+### ToDo
+
+- [TODO] Change main such that each algorithm may be commented out individually.
+- [TODO] Create documentation of standout choices and features.
+- [TODO] Which runs share seeds for fairness? Which benefit from random seeds?
+- [DONE] Separate data from plots, i.e. store data separately for easier creating of nicer plots.
+- [DONE] Update successive halving: Remove last round, manually update winner return.
+- [DONE] Implement smart argument optimizer algorithm.
+
+---
+
 ### Known Problems
 
-- plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
+- [PROBLEM] Softmax is never used. I believe it should be.
+- [PROBLEM/BUG] For some algorithms the parameter edge case is optimal. See below. Change parameter range. May be a bug.
+- [BUG] The curated plots do not work.
+- [BUG] Tune mean regret and final regret are (for some algorithms) very different. This is likely because the mean is being calculated over an mostly empty array, since only small gangs are part of the trials.
+- [BUG] Boltzmann with arbitrary noise does not work. (Or is really bad.)
+- [FIXED] plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
 
 ---
 
 ### Human read code
 
-- Basically nothing at this point. I'll work on that.
+- Basically nothing at this point. I'll work on that. Tho most things really seem fine.
 
 ---
+
+# Features
+
+- Instead of naively pulling one arm at a time, bandits and algorithms support bulk pulling. This greatly reduces runtime.
+- [UNFINISHED] For fairness, algorithms will be tested on the same seed - For better data, seeds are randomized between runs.
+- Parameters are picked out of a coarse grid with 50 candidates via successive 1/3-ing with reduced resource allocation.
+  Reducing pull count is questionable, especially for ETC, but seems to be a non-issue.
 
 ---
 
 # Setup
 
-_KEEP IN MIND THAT I USE LINUX. THE COMMANDS BELOW MAY OR MAY NOT WORK IN WINDOWS_
-
----
-
-Python version: 3.10.13 (arbitrary for now)  
-Notice extensive .gitignore - you need to set that up for yourself. I used pyenv, that worked fine. See more below.
-
----
-
-### Rules of Engagement
-
-- Read the README :)
-- Respect folder architecture, I do not want to pull random logs
-- Please add any python generated files such as caches that I missed to the .gitignore
-- Make sure you update requirements.txt
+_Keep in mind that the commands below are for linux mint (thus ubuntu, debian). I dont know how windows works._
 
 ---
 
 ### How to run anything.
 
-Create your own venv in the root folder CODE-Reinforcement-Learning.  
-I used pyenv, ChatGPT knows how to use that. (The Tutorial on its website is suboptimal)
+Python version: 3.10.13
+Create your own venv in the root folder CODE-Reinforcement-Learning.
 
 ---
 
@@ -46,61 +73,17 @@ Once run (obviously with your path)
     cd /home/felix/CODE-Reinforcement-Learning
     source venv/bin/activate
 
-Then, if the file is ./playground/hello_world.py, run:
+Then always run files from the root folder. For example, run ROOT/playground/hello_world.py via:
 
     python -m playground.hello_world
-
-This is needed for log()/out() to work. As I have absolutely no idea what I am doing, this surely can be improved.
-
-If you do not want to use my log()/out(), you should be able to simply run
-
-    python hello_world
-
-from playground/ or whereever your file is.
-
----
-
-### Intended foulder structure
-
-See below. Everything denoted [local] is in the .gitignore.
-
-    CODE-Reinforcement-Learning/
-    │
-    ├── src/                  [shared] core project code
-    │ ├── .../                [shared] ...
-    │
-    ├── script/               [shared] entry points
-    │
-    ├── tests/                [shared] standard tests.
-    │
-    ├── util/                 [shared] core utility functions
-    │
-    ├── doc/                  [shared] additional analysis & visualization only
-    │
-    ├── venv/                 [local] python virtual environment
-    │
-    ├── submissions/          [shared] zip-ready hand-ins  DO NOT TEST HERE
-    │ └── assignment1/        [shared] ...                 DO NOT TEST HERE
-    │
-    ├── log/                  [local] runtime logs
-    ├── out/                  [shared] figures, metrics, checkpoints
-    ├── playground/           [local] unrelated python testing
-    │
-    ├── .gitignore            [shared] excludes local & generated files
-    ├── requirements.txt      [shared] pinned runtime dependencies
-    ├── pyproject.toml        [shared] tooling & formatting config
-    ├── README.md             [shared]
 
 ---
 
 ### Shared utilites
 
-For specifying files, I recommend using
+For portability when specifying (output) files, I recommend the path relative to using
 
     from util.io_helpers import ROOT_DIR
-
-then using the path relative to that. Avoid absolute paths for portability. Paths relative to the .py file are fine,
-but may break if the file is moved. (for example to the submission folder)
 
 ---
 
@@ -118,11 +101,9 @@ Use log() and out() from util. Both can be used with or without specifying the e
 
 ### requirements.txt
 
-Please add any packages you use here, so that others can add them to their venvs:
+Please add any packages you use here, so that others can add them to their venvs. Version may or may not be specified:
 
     numpy==1.24.2          # exactly version 1.24.2
-    pandas>=2.0.0          # any version 2.0.0 or newer
-    scikit-learn<=1.3.0    # version up to 1.3.0
     matplotlib             # latest version available
 
 To update your venv, then use
@@ -130,8 +111,19 @@ To update your venv, then use
     source venv/bin/activate
     pip install -r requirements.txt
 
-To check installed packages, use
-
-    pip list
-
 ---
+
+# Ideal coefficients and their linspace
+
+- ETC 16 (1-50)
+- Greedy NONE
+- EpsGreedyFixed 0.04 (0.01-0.50)
+- EpsGreedyDecreasing 6.21 (0.01-50.00)
+- UCB 0.50 (0.01-0.50) [!]
+- UCBSubGaussian 0.35 (0.01-0.50)
+- BoltzmannSoftmax 0.35 (0.01-0.50)
+- BoltzmannGumbel 10.28 (0.01-50.00)
+- BoltzmannArbitraryNoise(gumbel) 8.25 (0.01-50.00)
+- GumbelScaledBonus 0.01 (0.01-50.00) [!]
+- PolicyGradient 0.33 (0.01-0.50)
+- PolicyGradientBaseline 0.45 (0.01-0.50)

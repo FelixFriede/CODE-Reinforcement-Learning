@@ -1,6 +1,7 @@
 # tools/io_helpers.py
 
 import os
+import numpy as np
 from datetime import datetime
 
 # Base directories relative to this file
@@ -8,12 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
 OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../out"))
 
-# Ensure directories exist
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(OUT_DIR, exist_ok=True)
-
-
-
+# Core utility functions
 def log(message: str, file_name: str = None):
     """
     Append a timestamped message to a log file in the log folder.
@@ -38,3 +34,8 @@ def out(message: str, file_name: str = None):
     with open(file_path, "a") as f:
         f.write(message + "\n")
     return file_name
+
+def _ensure_dir(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+

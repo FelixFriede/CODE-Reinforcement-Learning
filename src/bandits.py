@@ -135,6 +135,7 @@ class Gang_of_Bandits:
             self.means = self._init_random_means()
         else:
             self.means = self._init_given_means(means)
+            
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -152,8 +153,8 @@ class Gang_of_Bandits:
         else:  # bernoulli
             means = np.random.uniform(0.0, 1.0, size=(self.n_bandits, self.n_arms))
 
-        means.sort(axis=1)
-        return means[:, ::-1]
+        #means.sort(axis=1)
+        return means#[:, ::-1]
 
     def _init_given_means(self, means):
         """
@@ -171,7 +172,7 @@ class Gang_of_Bandits:
                 raise ValueError("Bernoulli means must lie in [0,1]")
 
         # sort arms descending so arm 0 is best
-        means = np.sort(means, axis=1)[:, ::-1]
+        # means = np.sort(means, axis=1)[:, ::-1]
 
         return means
 

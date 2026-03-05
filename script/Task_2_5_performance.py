@@ -1,77 +1,36 @@
 # experiments/ex2_all_algorithms_bernoulli.py
-#
-# Follows the general structure of the attached Exercise Sheet 1 solution (bulk-vectorized N runs,
-# per-step mean/var tracking, plotting helpers). :contentReference[oaicite:0]{index=0}
-#
-# Task:
-# - 5-armed Bernoulli bandit with random m_eans (shared across all algorithms for fairness)
-# - horizon n=10_000
-# - average over N=1_000 runs (vectorized as Gang_of_Bandits with n_bandits=N)
-# - compute-efficient parameter tuning via coarse grid search on shorter horizon
-# - plots:
-#   (a) regrets over time with 95% CI shading
-#   (b) boxplots at time n:
-#       i) true m_eans vs algorithm estimates (rank-aligned per run)
-#      ii) probability of playing each arm (counts/n)
-#     iii) cumulative regret distribution per algorithm
 
+# general
 from __future__ import annotations
-
-import os
-import sys
+import os, sys, json
+import numpy as np
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-import numpy as np
-import matplotlib.pyplot as plt
-
+# bandit supporting bulk pull
 from src.bandits import Gang_of_Bandits
 
 # bulk algorithms
 from src.etc import ETCBulkAlgorithm
-
-from src.greedy import (
-    GreedyBulkAlgorithm,
-    EpsilonGreedyFixedBulkAlgorithm,
-    EpsilonGreedyDecreasingBulkAlgorithm,
-)
-
+from src.greedy import GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm
 from src.ucb import UCBulkAlgorithm, UCBSubGaussianBulkAlgorithm
+from src.boltzmann import BoltzmannExplorationBulkAlgorithm, BoltzmannGumbelTrickBulkAlgorithm, BoltzmannArbitraryNoiseBulkAlgorithm, GumbelScaledBonusBulkAlgorithm
+from src.gradient import PolicyGradientBulkAlgorithm, PolicyGradientBaselineBulkAlgorithm
 
-from src.boltzmann import (
-    BoltzmannExplorationBulkAlgorithm,
-    BoltzmannGumbelTrickBulkAlgorithm,
-    BoltzmannArbitraryNoiseBulkAlgorithm,
-    GumbelScaledBonusBulkAlgorithm,
-)
-
-from src.gradient import (
-    PolicyGradientBulkAlgorithm,
-    PolicyGradientBaselineBulkAlgorithm,
-)
-
-from util.io_helpers import OUT_DIR
+# global utilities
+from util.io_helpers import OUT_DIR, _ensure_dir
 
 
 # -----------------------------
-# Small utilities
+# local utilities
 # -----------------------------
 
 def _mean_var(x, axis=0):
     x = np.asarray(x)
     return x.mean(axis=axis), x.var(axis=axis)  # population variance
 
-
-def _ci95_from_var(var: np.ndarray, N: int) -> np.ndarray:
-    # 95% CI half-width for mean using normal approx: 1.96 * sqrt(var / N)
-    return 1.96 * np.sqrt(var / float(N))
-
-
-def _ensure_dir(path: str) -> str:
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
+# BUG: Why is this not being used?
 def _softmax_rowwise(theta: np.ndarray) -> np.ndarray:
     # stable softmax for diagnostics only (not required for algorithms)
     x = theta - np.max(theta, axis=1, keepdims=True)
@@ -87,80 +46,47 @@ def _softmax_rowwise(theta: np.ndarray) -> np.ndarray:
 @dataclass(frozen=True)
 class AlgoSpec:
     name: str
-    # factory: (bandit: Gang_of_Bandits, params: dict) -> algorithm instance
-    factory: Callable[[Gang_of_Bandits, Dict[str, Any]], Any]
-    # parameter grid for tuning (list of dicts)
-    grid: List[Dict[str, Any]]
+    factory: Callable[[Gang_of_Bandits, Dict[str, Any]], Any] # (bandit: Gang_of_Bandits, params: dict) -> algorithm instance
+    grid: List[Dict[str, Any]] # parameter grid for tuning (list of dicts)
 
-
+# BUG: For some algorithms the parameter edge case is optimal. Change parameter range.
 def _algo_specs() -> List[AlgoSpec]:
+
+    def linspace_params(lo, hi, n=100, *, key: str, cast=None, round_to: int | None = None):
+        # Evenly spaced helper (inclusive endpoints), with optional rounding and int-casting.
+        vals = np.linspace(lo, hi, n)
+        out = []
+        for v in vals:
+            if round_to is not None:
+                v = float(np.round(v, round_to))
+            if cast is not None:
+                v = cast(v)
+            out.append({key: v})
+        return out
+
+    # Comment out Algorithms to remove them from data collection. Make sure data files are named appropriatly.
     return [
         # ETC
-        AlgoSpec(
-            name="ETC",
-            factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]),
-            grid=[{"m": m} for m in [1, 2, 3, 5, 10, 20, 50, 100]],
-        ),
+        AlgoSpec(name="ETC", factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]), grid=linspace_params(1, 50, 50, key="m", cast=int)),
+        
         # Greedy family
-        AlgoSpec(
-            name="Greedy",
-            factory=lambda b, p: GreedyBulkAlgorithm(b),
-            grid=[{}],
-        ),
-        AlgoSpec(
-            name="EpsGreedyFixed",
-            factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]),
-            grid=[{"epsilon": e} for e in [0.01, 0.03, 0.05, 0.1, 0.2]],
-        ),
-        AlgoSpec(
-            name="EpsGreedyDecreasing",
-            factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]),
-            grid=[{"epsilon0": e0} for e0 in [0.1, 0.3, 0.5, 1.0, 2.0, 5.0]],
-        ),
-        # UCB
-        AlgoSpec(
-            name="UCB",
-            factory=lambda b, p: UCBulkAlgorithm(b, delta=p["delta"]),
-            grid=[{"delta": d} for d in [0.01, 0.03, 0.05, 0.1, 0.2]],
-        ),
-        # For Bernoulli in [0,1], a safe subgaussian proxy is sigma=0.5
-        AlgoSpec(
-            name="UCBSubGaussian",
-            factory=lambda b, p: UCBSubGaussianBulkAlgorithm(b, delta=p["delta"], sigma=0.5),
-            grid=[{"delta": d} for d in [0.01, 0.03, 0.05, 0.1, 0.2]],
-        ),
+        AlgoSpec(name="Greedy", factory=lambda b, p: GreedyBulkAlgorithm(b), grid=[{}]),
+        AlgoSpec(name="EpsGreedyFixed", factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]), grid=linspace_params(0.01, 0.5, 50, key="epsilon", round_to=6)),
+        AlgoSpec(name="EpsGreedyDecreasing", factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]), grid=linspace_params(0.10, 50.00, 50, key="epsilon0", round_to=6)),
+        
+        # UCB family
+        AlgoSpec(name="UCB", factory=lambda b, p: UCBulkAlgorithm(b, delta=p["delta"]), grid=linspace_params(0.01, 0.5, 50, key="delta", round_to=6)),
+        AlgoSpec(name="UCBSubGaussian", factory=lambda b, p: UCBSubGaussianBulkAlgorithm(b, delta=p["delta"], sigma=0.5), grid=linspace_params(0.01, 0.5, 50, key="delta", round_to=6)),
+        
         # Boltzmann family
-        AlgoSpec(
-            name="BoltzmannSoftmax",
-            factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]),
-            grid=[{"theta": th} for th in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0]],
-        ),
-        AlgoSpec(
-            name="BoltzmannGumbel",
-            factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]),
-            grid=[{"theta": th} for th in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0]],
-        ),
-        AlgoSpec(
-            name="BoltzmannArbitraryNoise(gumbel)",
-            factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"),
-            grid=[{"theta": th} for th in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0]],
-        ),
-        AlgoSpec(
-            name="GumbelScaledBonus",
-            factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]),
-            grid=[{"C": c} for c in [0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0]],
-        ),
+        AlgoSpec(name="BoltzmannSoftmax", factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="BoltzmannGumbel", factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="BoltzmannArbitraryNoise(gumbel)", factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="GumbelScaledBonus", factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]), grid=linspace_params(0.01, 0.50, 50, key="C", round_to=6)),
+        
         # Policy gradient
-        AlgoSpec(
-            name="PolicyGradient",
-            factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]),
-            grid=[{"alpha": a} for a in [0.01, 0.03, 0.05, 0.1, 0.2]],
-        ),
-        AlgoSpec(
-            name="PolicyGradientBaseline",
-            factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]),
-            grid=[{"alpha": a} for a in [0.01, 0.03, 0.05, 0.1, 0.2]],
-        ),
+        AlgoSpec(name="PolicyGradient", factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
+        AlgoSpec(name="PolicyGradientBaseline", factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
     ]
 
 
@@ -176,15 +102,15 @@ def run_bulk_experiment(
     seed: int | None = None,
 ) -> Dict[str, Any]:
     """
-    Run N independent experiments in parallel (N = m_eans.shape[0]) for n_steps.
+    Run N independent experiments in parallel (N = means.shape[0]) for n_steps.
 
     Returns dict with:
       - inst_regret_mean/var (t)
       - cum_regret_mean/var (t)
       - final_regret_per_run (N,)
-      - true_m_eans_ranked (N,K)
-      - est_m_eans_ranked (N,K)  (final)
-      - play_prob_per_run_ranked (N,K)  (counts/n_steps, rank-aligned by true m_eans)
+      - true_means_ranked (N,K)
+      - est_means_ranked (N,K)  (final)
+      - play_prob_per_run_ranked (N,K)  (counts/n_steps, rank-aligned by true means)
     """
     if seed is not None:
         np.random.seed(seed)
@@ -217,8 +143,8 @@ def run_bulk_experiment(
     play_counts = np.zeros((N, K), dtype=np.int32)
 
     for t in range(n_steps):
-        if t % 500 == 0:
-            sys.stdout.write(f"\rRunning {spec.name:<28} | {params} | step {t}/{n_steps}")
+        if t % 1000 == 0:
+            sys.stdout.write(f"\rRunning {spec.name:<28} | {params} | gang size N={N} | step {t}/{n_steps}")
             sys.stdout.flush()
 
         chosen, rewards = algo.step()  # chosen: (N,), rewards: (N,)
@@ -244,7 +170,7 @@ def run_bulk_experiment(
         est = np.asarray(algo.arm_value_estimates)
     elif hasattr(algo, "theta"):
         # policy gradient: interpret softmax(theta) as preference; not a mean estimate.
-        # For plotting "m_eans vs estimates", we use empirical m_eans from tracking if present;
+        # For plotting "means vs estimates", we use empirical means from tracking if present;
         # if absent, we use NaNs.
         est = np.full((N, K), np.nan, dtype=float)
     else:
@@ -272,155 +198,122 @@ def run_bulk_experiment(
     }
 
 
+# -----------------------------
+# Tuning: successive 1/3-ing 
+# with reduced resources
+# -----------------------------
+
 def tune_parameters(
     spec: AlgoSpec,
     means: np.ndarray,
-    tune_steps: int = 3_000,
     seed: int = 123,
 ) -> Tuple[Dict[str, Any], float]:
-    """
-    Coarse grid search: pick params minimizing mean cumulative regret at tune_steps.
-    (Compute-efficient because each candidate runs in bulk over N=1000 in one go.)
-    """
-    best_params = spec.grid[0]
+    # Successive halving over the parameter grid.
+
+    # If only one candidate (e.g., Greedy), just sample once at full step length.
+    if len(spec.grid) == 1:
+        p = spec.grid[0]
+        means_r = means[: min(500, len(means))]
+        res = run_bulk_experiment(spec, p, means=means_r, n_steps=10000, seed=seed)
+        score = float(res["cum_regret_mean"][-1])
+        return p, score
+
+    eta = 3  # halving factor
+    n_rounds = 3
+    candidates = list(spec.grid) # 50 -> 16 -> 5
+
+    # Hard-coded increasing budgets per round
+    steps_schedule = [2000, 4000, 10000]
+    N_schedule = [25, 50, 100]
+
+    best_params = candidates[0]
     best_score = float("inf")
 
-    for i, p in enumerate(spec.grid):
-        res = run_bulk_experiment(spec, p, means=means, n_steps=tune_steps, seed=seed + i)
-        score = float(res["cum_regret_mean"][-1])  # mean cumulative regret at horizon
-        if score < best_score:
-            best_score = score
-            best_params = p
+    for r in range(n_rounds):
+        n_steps_r = steps_schedule[r]
+        N_r = N_schedule[r]
 
-    return best_params, best_score
+        # Truncate means to control "bulk N"
+        means_r = means[: min(N_r, len(means))]
+
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for i, p in enumerate(candidates):
+            res = run_bulk_experiment(
+                spec,
+                p,
+                means=means_r,
+                n_steps=n_steps_r,
+                seed=seed + 10_000 * r + i,
+            )
+            score = float(res["cum_regret_mean"][-1])
+            scored.append((score, p))
+
+        scored.sort(key=lambda x: x[0])  # lower regret is better
+
+        # Track best seen
+        if scored[0][0] < best_score:
+            best_score = scored[0][0]
+            best_params = scored[0][1]
+
+        if r == n_rounds - 1:
+            break
+
+        # Keep top fraction
+        keep = max(1, len(scored) // eta)
+        candidates = [p for _, p in scored[:keep]]
+
+    print(f"Best params for {spec.name}: {best_params} (tune mean regret @ {10_000} steps = {best_score:.4f})")
+
+    return best_params
 
 
 # -----------------------------
-# Plotting (exercise-sheet style)
+# Run for Graph Data
 # -----------------------------
 
-def plot_regret_with_ci(results: List[Dict[str, Any]], out_dir: str, kind: str = "cum"):
-    """
-    kind: "cum" or "inst"
-    """
-    _ensure_dir(out_dir)
-    n_steps = results[0]["n_steps"]
-    N = results[0]["N"]
-    t = np.arange(n_steps)
+def full_run(
+    spec: AlgoSpec,
+    best_params: Dict[str, Any],
+    means: np.ndarray,
+    n_steps: int,
+    seed: int | None = None,
+) -> Dict[str, Any]:
+    
+    # This only exists for terminal status update
+    res = run_bulk_experiment(spec, best_params, means=means, n_steps=n_steps, seed=2000)
+    print(f"Done {spec.name}: mean final regret = {float(res['cum_regret_mean'][-1]):.4f}")
+    return res
 
-    plt.figure()
-    for r in results:
-        if kind == "cum":
-            mean = r["cum_regret_mean"]
-            var = r["cum_regret_var"]
-            ylabel = "Average cumulative regret"
-            title = "Cumulative regret with 95% CI"
-            fname = "regret_cumulative_ci.png"
+
+# ----------------------
+# data saving helpers
+# ----------------------
+
+def _split_res(res: Dict[str, Any]):
+    arrays = {}
+    meta = {}
+
+    for k, v in res.items():
+        if isinstance(v, np.ndarray):
+            arrays[k] = v
         else:
-            mean = r["inst_regret_mean"]
-            var = r["inst_regret_var"]
-            ylabel = "Average instant regret"
-            title = "Instant regret with 95% CI"
-            fname = "regret_instant_ci.png"
+            meta[k] = v
 
-        ci = _ci95_from_var(var, N)
-        plt.plot(t, mean, label=f"{r['name']} {r['params']}")
-        plt.fill_between(t, mean - ci, mean + ci, alpha=0.15)
-
-    plt.xlabel("t")
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.legend(ncol=2, fontsize=8)
-    plt.savefig(os.path.join(out_dir, fname), dpi=160)
-    plt.close()
+    return arrays, meta
 
 
-def plot_boxplot_true_vs_estimates(results: List[Dict[str, Any]], out_dir: str):
-    """
-    Rank-aligned boxplots (best arm rank 1 .. K):
-      - true m_eans
-      - each algorithm's final estimates (if available; NaNs are ignored via masked arrays)
-    """
-    _ensure_dir(out_dir)
-    K = results[0]["K"]
+def _save_run(out_dir: str, res: Dict[str, Any]):
+    arrays, meta = _split_res(res)
 
-    true_ranked = results[0]["true_means_ranked"]  # (N,K) same across all results
-    data = []
-    labels = []
+    np.savez_compressed(os.path.join(out_dir, "result_arrays.npz"), **arrays)
 
-    # true m_eans first
-    for r in range(K):
-        data.append(true_ranked[:, r])
-        labels.append(f"true r{r+1}")
-
-    # then each algorithm estimates
-    for res in results:
-        est = res["est_means_ranked_final"]  # (N,K)
-        for r in range(K):
-            col = est[:, r]
-            # ignore NaNs cleanly
-            col = col[np.isfinite(col)]
-            data.append(col)
-            labels.append(f"{res['name']} r{r+1}")
-
-    plt.figure(figsize=(max(10, 0.22 * len(labels)), 5))
-    plt.boxplot(data, showfliers=False)
-    plt.xticks(np.arange(1, len(labels) + 1), labels, rotation=90)
-    plt.ylabel("Value")
-    plt.title("True means vs final estimates (rank-aligned)")
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "box_true_vs_estimates.png"), dpi=160)
-    plt.close()
+    with open(os.path.join(out_dir, "result_meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, default=str)
 
 
-def plot_boxplot_play_probabilities(results: List[Dict[str, Any]], out_dir: str):
-    """
-    Rank-aligned arm play probabilities over the full horizon (counts/n_steps).
-    """
-    _ensure_dir(out_dir)
-    K = results[0]["K"]
-
-    data = []
-    labels = []
-
-    for res in results:
-        probs = res["play_prob_ranked"]  # (N,K)
-        for r in range(K):
-            data.append(probs[:, r])
-            labels.append(f"{res['name']} r{r+1}")
-
-    plt.figure(figsize=(max(10, 0.22 * len(labels)), 5))
-    plt.boxplot(data, showfliers=False)
-    plt.xticks(np.arange(1, len(labels) + 1), labels, rotation=90)
-    plt.ylabel("Probability")
-    plt.title("Play probabilities per arm rank (counts/n)")
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "box_play_probabilities.png"), dpi=160)
-    plt.close()
-
-
-def plot_boxplot_regrets(results: List[Dict[str, Any]], out_dir: str):
-    """
-    Boxplot of final cumulative regrets (one value per run).
-    """
-    _ensure_dir(out_dir)
-
-    data = [res["final_regret_per_run"] for res in results]
-    labels = [f"{res['name']} {res['params']}" for res in results]
-
-    plt.figure(figsize=(max(10, 0.35 * len(labels)), 5))
-    plt.boxplot(data, showfliers=False)
-    plt.xticks(np.arange(1, len(labels) + 1), labels, rotation=90)
-    plt.ylabel("Cumulative regret at n")
-    plt.title("Final regret distributions")
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "box_final_regrets.png"), dpi=160)
-    plt.close()
-
-
-# -----------------------------
-# Main
-# -----------------------------
+# -----------------
+# main
+# -----------------
 
 def main():
     # experiment constants
@@ -428,48 +321,40 @@ def main():
     n_steps = 10_000
     N = 1_000
 
-    # tuning horizon (keep smaller for compute efficiency)
-    tune_steps = 3_000
-
-    # top-level output folder
-    out_dir = _ensure_dir(os.path.join(OUT_DIR, "ex2_all_algorithms_bernoulli"))
-    print(f"Writing outputs to: {out_dir}")
-
-    # Make ONE shared random m_eans matrix for fairness across algorithms.
-    # (Each row is one independent bandit instance.)
+    # shared bandit instances
     np.random.seed(0)
     means = np.random.rand(N, K)
 
-    # Tune parameters (coarse grid) + run full horizon with best params
-    results: List[Dict[str, Any]] = []
+    base_dir = _ensure_dir(os.path.join(OUT_DIR, "ex2_all_algorithms_bernoulli"))
+    print(f"Writing data to: {base_dir}")
+
+    index = []
 
     for spec in _algo_specs():
-        print(f"\nTuning {spec.name} over {len(spec.grid)} candidate(s) ...")
-        best_params, best_score = tune_parameters(spec, means=means, tune_steps=tune_steps, seed=1000)
-        print(f"Best params for {spec.name}: {best_params} (tune mean regret @ {tune_steps} = {best_score:.4f})")
+        print(f"\r\033[KRunning algorithm: {spec.name}", end="")
 
-        print(f"Running full horizon for {spec.name} ...")
-        res = run_bulk_experiment(spec, best_params, means=means, n_steps=n_steps, seed=2000)
-        results.append(res)
-        print(f"Done {spec.name}: mean final regret = {float(res['cum_regret_mean'][-1]):.4f}")
+        # parameter tuning
+        best_params = tune_parameters(spec, means=means, seed=1000)
 
-    # Plots requested:
-    # (a) regret curves with 95% CI shading
-    plot_regret_with_ci(results, out_dir=out_dir, kind="cum")
-    plot_regret_with_ci(results, out_dir=out_dir, kind="inst")
+        # full run
+        res = full_run(spec, best_params, means=means, n_steps=n_steps, seed=2000)
 
-    # (b) boxplots at end of horizon
-    plot_boxplot_true_vs_estimates(results, out_dir=out_dir)      # (i)
-    plot_boxplot_play_probabilities(results, out_dir=out_dir)     # (ii)
-    plot_boxplot_regrets(results, out_dir=out_dir)                # (iii)
+        # algorithm-specific folder
+        algo_dir = os.path.join(base_dir, spec.name)
+        os.makedirs(algo_dir, exist_ok=True)
 
-    print("\nAll done.")
-    print("Created:")
-    print(" - regret_cumulative_ci.png")
-    print(" - regret_instant_ci.png")
-    print(" - box_true_vs_estimates.png")
-    print(" - box_play_probabilities.png")
-    print(" - box_final_regrets.png")
+        _save_run(algo_dir, res)
+
+        index.append({
+            "algorithm": spec.name,
+            "dir": spec.name
+        })
+
+        print(f"\r\033[KSaved results for algorithm: {spec.name}")
+
+    # save lightweight index
+    with open(os.path.join(base_dir, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=2)
 
 
 if __name__ == "__main__":
