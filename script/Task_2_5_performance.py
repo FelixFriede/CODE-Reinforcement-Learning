@@ -1,11 +1,13 @@
 # experiments/ex2_all_algorithms_bernoulli.py
+# This file is CORE.
+# However, data saving (instead of straight image rendering) was introduced late and is purely AI generated and not proof read.
+
 
 # general
 from __future__ import annotations
 import os, sys, json
 import numpy as np
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 # bandit supporting bulk pull
@@ -37,6 +39,32 @@ def _softmax_rowwise(theta: np.ndarray) -> np.ndarray:
     ex = np.exp(x)
     s = np.sum(ex, axis=1, keepdims=True)
     return ex / s
+
+
+# ----------------------
+# data saving helpers
+# ----------------------
+
+def _split_res(res: Dict[str, Any]):
+    arrays = {}
+    meta = {}
+
+    for k, v in res.items():
+        if isinstance(v, np.ndarray):
+            arrays[k] = v
+        else:
+            meta[k] = v
+
+    return arrays, meta
+
+
+def _save_run(out_dir: str, res: Dict[str, Any]):
+    arrays, meta = _split_res(res)
+
+    np.savez_compressed(os.path.join(out_dir, "result_arrays.npz"), **arrays)
+
+    with open(os.path.join(out_dir, "result_meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, default=str)
 
 
 # -----------------------------
@@ -199,8 +227,7 @@ def run_bulk_experiment(
 
 
 # -----------------------------
-# Tuning: successive 1/3-ing 
-# with reduced resources
+# Tuning: successive 1/3-ing with reduced resources
 # -----------------------------
 
 def tune_parameters(
@@ -219,11 +246,11 @@ def tune_parameters(
         return p, score
 
     eta = 3  # halving factor
-    n_rounds = 3
-    candidates = list(spec.grid) # 50 -> 16 -> 5
+    n_rounds = 3 # 50 -> 16 -> 5
+    candidates = list(spec.grid) 
 
     # Hard-coded increasing budgets per round
-    steps_schedule = [2000, 4000, 10000]
+    steps_schedule = [1000, 3000, 10000]
     N_schedule = [25, 50, 100]
 
     best_params = candidates[0]
@@ -267,50 +294,6 @@ def tune_parameters(
     return best_params
 
 
-# -----------------------------
-# Run for Graph Data
-# -----------------------------
-
-def full_run(
-    spec: AlgoSpec,
-    best_params: Dict[str, Any],
-    means: np.ndarray,
-    n_steps: int,
-    seed: int | None = None,
-) -> Dict[str, Any]:
-    
-    # This only exists for terminal status update
-    res = run_bulk_experiment(spec, best_params, means=means, n_steps=n_steps, seed=2000)
-    print(f"Done {spec.name}: mean final regret = {float(res['cum_regret_mean'][-1]):.4f}")
-    return res
-
-
-# ----------------------
-# data saving helpers
-# ----------------------
-
-def _split_res(res: Dict[str, Any]):
-    arrays = {}
-    meta = {}
-
-    for k, v in res.items():
-        if isinstance(v, np.ndarray):
-            arrays[k] = v
-        else:
-            meta[k] = v
-
-    return arrays, meta
-
-
-def _save_run(out_dir: str, res: Dict[str, Any]):
-    arrays, meta = _split_res(res)
-
-    np.savez_compressed(os.path.join(out_dir, "result_arrays.npz"), **arrays)
-
-    with open(os.path.join(out_dir, "result_meta.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=2, default=str)
-
-
 # -----------------
 # main
 # -----------------
@@ -337,7 +320,8 @@ def main():
         best_params = tune_parameters(spec, means=means, seed=1000)
 
         # full run
-        res = full_run(spec, best_params, means=means, n_steps=n_steps, seed=2000)
+        res = run_bulk_experiment(spec, best_params, means=means, n_steps=n_steps, seed=2000)
+        print(f"Done {spec.name}: mean final regret = {float(res['cum_regret_mean'][-1]):.4f}")
 
         # algorithm-specific folder
         algo_dir = os.path.join(base_dir, spec.name)

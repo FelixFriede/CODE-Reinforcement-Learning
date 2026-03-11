@@ -1,11 +1,127 @@
 # scr/bandits.py
+# This file contains
+# - Bandit (LEGACY, pull one arm at a time)
+# - Gang_of_Bandits (CORE, supports bulk pulling)
 
+# TESTING
 # from util.io_helpers import log, out
-# do not let classes log themselves.
 
 import numpy as np
 
 
+class Gang_of_Bandits:
+    """
+    Bulk bandit simulator: n_bandits independent bandits, each with n_arms arms.
+    Means are stored as a matrix of shape (n_bandits, n_arms).
+
+    bulk_pull supports:
+      - arm_index: int -> all bandits pull the same arm
+      - arm_index: array-like shape (n_bandits,) -> each bandit pulls its own arm
+    """
+
+    def __init__(self, n_bandits, n_arms, distribution, means=None):
+        self.n_bandits = int(n_bandits)
+        self.n_arms = int(n_arms)
+        self.distribution = distribution
+
+        if self.n_bandits <= 0 or self.n_arms <= 0:
+            raise ValueError("n_bandits and n_arms must be positive integers")
+
+        # ---- validate distribution ----
+        if distribution not in ("gaussian", "bernoulli"):
+            raise ValueError("distribution must be 'gaussian' or 'bernoulli'")
+
+        # ---- initialize means ----
+        if means is None:
+            self.means = self._init_random_means()
+        else:
+            self.means = self._init_given_means(means)
+            
+
+    # ------------------------------------------------------------------
+    # Initialization helpers
+    # ------------------------------------------------------------------
+
+    def _init_random_means(self):
+        # Initialize random per-bandit means.
+
+        if self.distribution == "gaussian":
+            means = np.random.randn(self.n_bandits, self.n_arms)
+        else:  # bernoulli
+            means = np.random.uniform(0.0, 1.0, size=(self.n_bandits, self.n_arms))
+
+        return means
+
+    def _init_given_means(self, means):
+        # Initialize using user-provided means.
+
+        means = np.asarray(means, dtype=float)
+
+        if means.shape != (self.n_bandits, self.n_arms):
+            raise ValueError(
+                f"means must have shape ({self.n_bandits}, {self.n_arms})"
+            )
+
+        if self.distribution == "bernoulli":
+            if (means < 0).any() or (means > 1).any():
+                raise ValueError("Bernoulli means must lie in [0,1]")
+
+        return means
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def bulk_pull(self, arm_index):
+        """
+        Return rewards for one pull across all bandits.
+
+        Parameters
+        ----------
+        arm_index : int or array-like
+            - int: all bandits pull that arm
+            - array-like of shape (n_bandits,): each bandit pulls its own arm
+
+        Returns
+        -------
+        rewards : np.ndarray of shape (n_bandits,)
+        """
+
+        # Fast path: scalar arm index for all bandits
+        if np.isscalar(arm_index):
+            a = int(arm_index)
+            if a < 0 or a >= self.n_arms:
+                raise IndexError("Invalid arm index")
+
+            mu = self.means[:, a]
+
+            if self.distribution == "gaussian":
+                return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)
+
+            # else: self.distribution == "bernoulli":
+            return (np.random.random(self.n_bandits) < mu).astype(np.int8)
+
+        # General path: one arm per bandit
+        arms = np.asarray(arm_index)
+
+        if arms.shape != (self.n_bandits,):
+            raise ValueError(f"arm_index must be an int or shape ({self.n_bandits},)")
+
+        if (arms < 0).any() or (arms >= self.n_arms).any():
+            raise IndexError("Invalid arm index in arm_index array")
+
+        rows = np.arange(self.n_bandits)
+        mu = self.means[rows, arms]
+
+        if self.distribution == "gaussian":
+            return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)
+
+        # else: self.distribution == "bernoulli":
+        return (np.random.random(self.n_bandits) < mu).astype(np.int8)
+    
+    
+
+# IMPORTANT: This is a working version and not part of the final assigment, some features might be legacy.
 class Bandit:
     """
     Stochastic multi-armed bandit supporting Gaussian and Bernoulli arms.
@@ -105,122 +221,4 @@ class Bandit:
         # log(f"Pull | arm={arm_index}, mean={mu}, reward={reward}",self.LOG_FILE)
 
         return reward
-    
-    
-
-class Gang_of_Bandits:
-    """
-    Bulk bandit simulator: n_bandits independent bandits, each with n_arms arms.
-    Means are stored as a matrix of shape (n_bandits, n_arms).
-
-    bulk_pull supports:
-      - arm_index: int -> all bandits pull the same arm
-      - arm_index: array-like shape (n_bandits,) -> each bandit pulls its own arm
-    """
-
-    def __init__(self, n_bandits, n_arms, distribution, means=None):
-        self.n_bandits = int(n_bandits)
-        self.n_arms = int(n_arms)
-        self.distribution = distribution
-
-        if self.n_bandits <= 0 or self.n_arms <= 0:
-            raise ValueError("n_bandits and n_arms must be positive integers")
-
-        # ---- validate distribution ----
-        if distribution not in ("gaussian", "bernoulli"):
-            raise ValueError("distribution must be 'gaussian' or 'bernoulli'")
-
-        # ---- initialize means ----
-        if means is None:
-            self.means = self._init_random_means()
-        else:
-            self.means = self._init_given_means(means)
-            
-
-    # ------------------------------------------------------------------
-    # Initialization helpers
-    # ------------------------------------------------------------------
-
-    def _init_random_means(self):
-        """
-        Initialize random per-bandit means and sort arms *within each bandit*.
-
-        Sorting is descending (best arm at index 0), which makes arm indices
-        comparable across runs for plotting.
-        """
-        if self.distribution == "gaussian":
-            means = np.random.randn(self.n_bandits, self.n_arms)
-        else:  # bernoulli
-            means = np.random.uniform(0.0, 1.0, size=(self.n_bandits, self.n_arms))
-
-        #means.sort(axis=1)
-        return means#[:, ::-1]
-
-    def _init_given_means(self, means):
-        """
-        Initialize using user-provided means.
-        """
-        means = np.asarray(means, dtype=float)
-
-        if means.shape != (self.n_bandits, self.n_arms):
-            raise ValueError(
-                f"means must have shape ({self.n_bandits}, {self.n_arms})"
-            )
-
-        if self.distribution == "bernoulli":
-            if (means < 0).any() or (means > 1).any():
-                raise ValueError("Bernoulli means must lie in [0,1]")
-
-        # sort arms descending so arm 0 is best
-        # means = np.sort(means, axis=1)[:, ::-1]
-
-        return means
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def bulk_pull(self, arm_index):
-        """
-        Return rewards for one pull across all bandits.
-
-        Parameters
-        ----------
-        arm_index : int or array-like
-            - int: all bandits pull that arm
-            - array-like of shape (n_bandits,): each bandit pulls its own arm
-
-        Returns
-        -------
-        rewards : np.ndarray of shape (n_bandits,)
-        """
-
-        # Fast path: scalar arm index for all bandits
-        if np.isscalar(arm_index):
-            a = int(arm_index)
-            if a < 0 or a >= self.n_arms:
-                raise IndexError("Invalid arm index")
-
-            mu = self.means[:, a]
-
-            if self.distribution == "gaussian":
-                return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)
-
-            return (np.random.random(self.n_bandits) < mu).astype(np.int8)
-
-        # General path: one arm per bandit
-        arms = np.asarray(arm_index)
-
-        if arms.shape != (self.n_bandits,):
-            raise ValueError(f"arm_index must be an int or shape ({self.n_bandits},)")
-
-        if (arms < 0).any() or (arms >= self.n_arms).any():
-            raise IndexError("Invalid arm index in arm_index array")
-
-        rows = np.arange(self.n_bandits)
-        mu = self.means[rows, arms]
-
-        if self.distribution == "gaussian":
-            return np.random.normal(loc=mu, scale=1.0, size=self.n_bandits)
-
-        return (np.random.random(self.n_bandits) < mu).astype(np.int8)
+        

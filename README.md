@@ -1,20 +1,21 @@
-# README - TA
+# README
 
-### General
-
-Python version:
+Python version
 
     3.10.13
+
+Runtime dependencies are listed in requirements.txt can be installed via
+
+    source venv/bin/activate
+    pip install -r requirements.txt
 
 Always run files from the root folder. For example, run ROOT/playground/hello_world.py via:
 
     source venv/bin/activate
     python -m playground.hello_world
 
-Runtime dependencies can be installed via
-
-    source venv/bin/activate
-    pip install -r requirements.txt
+Each file header contains information about its contents, i.e. if it is CORE (part of the final assigment), LEGACY or TESTING.
+Whenever parts of the code (like some LEGACY content and some plots) are purely AI generated and barely proof read, they are marked as such.
 
 ### Project structure
 
@@ -34,20 +35,56 @@ Runtime dependencies can be installed via
     ├── .gitignore            [shared]
     ├── README.md             [shared]
 
+### Important files and their classes
+
+    - [LEGACY] script/Task_1_8_naive
+    - [CORE] script/Task_1_8_graphs
+    - [CORE] script/Task_1_8_performance
+    - [CORE] script/Task_2_5_graphs
+    - [TODO] script/Task_2_5_performance
+    - [CORE] src/bandits                    [CORE] Gang_of_Bandits, [LEGACY] Bandit
+    - [TODO] src/boltzmann
+    - [CORE] src/etc                        [CORE] ETCBulkAlgorithm, [LEGACY] ETCAlgorithm
+    - [TODO] src/gradient
+    - [TODO] src/greedy
+    - [TODO] src/ucb
+
 ### Features
 
-- Instead of naively pulling one arm at a time, bandits and algorithms support bulk pulling. This greatly reduces runtime.
+- Instead of naively pulling one arm at a time, bandits and algorithms support bulk pulling.
+  This greatly reduces runtime. However, tracking means and other data becomes somewhat convoluted.
   As this was noticed early, the single pull version of most algorithms where never tested or even human read.
 - [UNFINISHED] For fairness, algorithms will be tested on the same seed - For better data, seeds are randomized between runs.
 - Parameters are picked out of a coarse grid with 50 candidates via successive 1/3-ing with reduced resource allocation.
   Reducing pull count is questionable, especially for ETC, but seems to be a non-issue.
 
+### Expected runtime
+
+On my laptop:
+
+    Intel(R) Celeron(R) N4500 @ 1.10GHz (2 Cores, 2 Threads)
+    RAM: 8 GB
+    Linux Mint 22.2
+
+    script/Task_1_8_performance:
+    script/Task_2_5_performance:
+
+On some cloud computer:
+
+    Intel(R) Celeron(R) N4500 @ 1.10GHz (2 Cores, 2 Threads)
+    RAM: 8 GB
+    Linux Mint 22.2
+
+    script/Task_1_8_performance:
+    script/Task_2_5_performance:
+
 ---
 
-# README - Intern
+# INTERN
 
 ### ToDo
 
+- [TODO] Create flow diagram
 - [TODO] Change main such that each algorithm may be commented out individually.
 - [TODO] Create documentation of standout choices and features.
 - [TODO] Which runs share seeds for fairness? Which benefit from random seeds?
@@ -63,49 +100,6 @@ Runtime dependencies can be installed via
 - [BUG] Tune mean regret and final regret are (for some algorithms) very different. This is likely because the mean is being calculated over an mostly empty array, since only small gangs are part of the trials.
 - [BUG] Boltzmann with arbitrary noise does not work. (Or is really bad.)
 - [FIXED] plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
-
-### Human read code
-
-- [TODO] script/Task_1_8_graphs
-- [TODO] script/Task_1_8_naive
-- [TODO] script/Task_1_8_performance
-- [TODO] script/Task_2_5_graphs
-- [TODO] script/Task_2_5_performance
-- [TODO] src/bandits
-- [TODO] src/boltzmann
-- [TODO] src/etc
-- [TODO] src/gradient
-- [TODO] src/greedy
-- [TODO] src/ucb
-- [TODO] util/io_helpers
-
-### Shared utilites
-
-For portability when specifying (output) files, I recommend the path relative to using
-
-    from util.io_helpers import ROOT_DIR
-
-Use log() and out() from util. Both can be used with or without specifying the exact file name. Example usage below:
-
-    from util.io_helpers import log, out
-
-    log("This is a test message. Output will be log/log.txt")
-    log("This is a test message. Output will be log/my_custom_log.txt", "my_custom_log.txt")
-
-    out("Hello world")
-    out("Hello world", "demo.txt")
-
-### requirements.txt
-
-Please add any packages you use here, so that others can add them to their venvs. Version may or may not be specified:
-
-    numpy==1.24.2          # exactly version 1.24.2
-    matplotlib             # latest version available
-
-To update your venv, then use
-
-    source venv/bin/activate
-    pip install -r requirements.txt
 
 # Ideal coefficients and their linspace
 

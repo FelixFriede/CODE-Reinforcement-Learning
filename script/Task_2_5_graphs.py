@@ -1,4 +1,5 @@
 # script/Task_2_5_graphs.py
+# This is purely AI generated.
 
 # general
 from __future__ import annotations

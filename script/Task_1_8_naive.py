@@ -1,6 +1,8 @@
-# File: src/experiment_etc.py
-# Pulling 1000*10000*5 arms one at a time seems insane given that vectorization exists.
+# src/experiment_etc.py
+# IMPORTANT: This is a working version and not part of the final assigment, all features are legacy.
 
+# This is the naive implementation if Blatt 1, Aufgabe 8.
+# Pulling 1000*10000*5 arms one at a time seems insane given that vectorization exists.
 import numpy as np
 import matplotlib.pyplot as plt
 

@@ -1,13 +1,95 @@
 # src/etc.py
+# This file contains
+# - ETCAlgorithm (LEGACY, pull one arm at a time)
+# - ETCBulkAlgorithm (CORE, supports bulk pulling)
 
 from src.bandits import Bandit, Gang_of_Bandits
 import numpy as np
 
-
+# TESTING
 # from util.io_helpers import log, out
-# do not let classes log themselves.
 
 
+class ETCBulkAlgorithm:
+    """
+    Bulk Explore-Then-Commit (ETC) algorithm.
+
+    Assumption: all bandits use the same exploration schedule and therefore
+    finish exploration at the same time (after exploration_rounds * n_arms steps).
+    """
+
+    def __init__(self, gang: Gang_of_Bandits, exploration_rounds: int):
+        self.gang = gang
+        self.exploration_rounds = int(exploration_rounds)
+
+        self.n_bandits = gang.n_bandits
+        self.n_arms = gang.n_arms
+
+        if self.exploration_rounds <= 0:
+            raise ValueError("explorati on_rounds must be a positive integer")
+
+        # Total exploration steps
+        self.exploration_steps_total = self.exploration_rounds * self.n_arms
+
+        # Tracking
+        self.total_steps = 0
+        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
+        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+        # Commitment
+        self.committed_arm = np.full(self.n_bandits, -1, dtype=np.int32)
+        self.committed = False
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _in_exploration_phase(self) -> bool:
+        return self.total_steps < self.exploration_steps_total
+
+    def _select_exploration_arms(self) -> np.ndarray:
+        # Round-robin: a_t = t mod K (same arm for every bandit on step t)
+        arm = self.total_steps % self.n_arms
+        return np.full(self.n_bandits, arm, dtype=np.int32)
+
+    def _commit_to_best_arms(self) -> None:
+        # Empirical means are well-defined because each arm has exactly exploration_rounds pulls.
+        empirical_means = self.arm_reward_sums / self.exploration_rounds
+        self.committed_arm = np.argmax(empirical_means, axis=1).astype(np.int32, copy=False)
+        self.committed = True
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def step(self):
+        """
+        Perform ONE bulk step.
+
+        Returns
+        -------
+        chosen_arms : np.ndarray shape (n_bandits,)
+        rewards : np.ndarray shape (n_bandits,)
+        """
+        if self._in_exploration_phase():
+            chosen_arms = self._select_exploration_arms()
+        else:
+            if not self.committed:
+                self._commit_to_best_arms()
+            chosen_arms = self.committed_arm
+
+        rewards = self.gang.bulk_pull(chosen_arms)
+
+        rows = np.arange(self.n_bandits)
+        self.arm_pull_counts[rows, chosen_arms] += 1
+        self.arm_reward_sums[rows, chosen_arms] += rewards
+
+        self.total_steps += 1
+        return chosen_arms, rewards
+    
+
+
+# IMPORTANT: This is a working version and not part of the final assigment, some features might be legacy.
 class ETCAlgorithm:
 
     def __init__(self, bandit: Bandit, exploration_rounds: int):
@@ -103,80 +185,3 @@ class ETCAlgorithm:
 
 
 
-
-class ETCBulkAlgorithm:
-    """
-    Bulk Explore-Then-Commit (ETC) algorithm.
-
-    Assumption: all bandits use the same exploration schedule and therefore
-    finish exploration at the same time (after exploration_rounds * n_arms steps).
-    """
-
-    def __init__(self, gang: Gang_of_Bandits, exploration_rounds: int):
-        self.gang = gang
-        self.exploration_rounds = int(exploration_rounds)
-
-        self.n_bandits = gang.n_bandits
-        self.n_arms = gang.n_arms
-
-        if self.exploration_rounds <= 0:
-            raise ValueError("exploration_rounds must be a positive integer")
-
-        # Total exploration steps (global, same for all bandits)
-        self.exploration_steps_total = self.exploration_rounds * self.n_arms
-
-        # Tracking
-        self.total_steps = 0
-        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
-        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
-
-        # Commitment
-        self.committed_arm = np.full(self.n_bandits, -1, dtype=np.int32)
-        self.committed = False
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _in_exploration_phase(self) -> bool:
-        return self.total_steps < self.exploration_steps_total
-
-    def _select_exploration_arms(self) -> np.ndarray:
-        # Round-robin: a_t = t mod K (same arm for every bandit on step t)
-        arm = self.total_steps % self.n_arms
-        return np.full(self.n_bandits, arm, dtype=np.int32)
-
-    def _commit_to_best_arms(self) -> None:
-        # Empirical means are well-defined because each arm has exactly exploration_rounds pulls.
-        empirical_means = self.arm_reward_sums / self.exploration_rounds
-        self.committed_arm = np.argmax(empirical_means, axis=1).astype(np.int32, copy=False)
-        self.committed = True
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def step(self):
-        """
-        Perform ONE bulk step.
-
-        Returns
-        -------
-        chosen_arms : np.ndarray shape (n_bandits,)
-        rewards : np.ndarray shape (n_bandits,)
-        """
-        if self._in_exploration_phase():
-            chosen_arms = self._select_exploration_arms()
-        else:
-            if not self.committed:
-                self._commit_to_best_arms()
-            chosen_arms = self.committed_arm
-
-        rewards = self.gang.bulk_pull(chosen_arms)
-
-        rows = np.arange(self.n_bandits)
-        self.arm_pull_counts[rows, chosen_arms] += 1
-        self.arm_reward_sums[rows, chosen_arms] += rewards
-
-        self.total_steps += 1
-        return chosen_arms, rewards

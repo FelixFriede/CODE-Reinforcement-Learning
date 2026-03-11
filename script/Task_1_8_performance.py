@@ -1,4 +1,6 @@
 # script/Task_1_8_performance.py
+# This file is CORE.
+# However, data saving (instead of straight image rendering) was introduced late and is purely AI generated and not proof read.
 
 # general
 import numpy as np
@@ -24,16 +26,17 @@ def _mean_var(x, axis=0):
     return x.mean(axis=axis), x.var(axis=axis)
 
 
-# ----------------------
-# data saving helpers
-# ----------------------
-
 def get_experiment_out_dir(result: dict[str, Any]) -> str:
+
     m = result["exploration_rounds"]
     exp_dir = os.path.join(OUT_DIR, "ex1_etc", f"etc_m{m}")
     os.makedirs(exp_dir, exist_ok=True)
     return exp_dir
 
+
+# ----------------------
+# data saving helpers (not proof read)
+# ----------------------
 
 def _is_np_array_like(x: Any) -> bool:
     return isinstance(x, np.ndarray)
