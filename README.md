@@ -1,22 +1,50 @@
-# CODE-Reinforcement-Learning
+# README - TA
+
+### General
+
+Python version:
+
+    3.10.13
+
+Always run files from the root folder. For example, run ROOT/playground/hello_world.py via:
+
+    source venv/bin/activate
+    python -m playground.hello_world
+
+Runtime dependencies can be installed via
+
+    source venv/bin/activate
+    pip install -r requirements.txt
+
+### Project structure
 
     CODE-Reinforcement-Learning/
     │
-    ├── src/                  [shared] core project code
-    ├── script/               [shared] entry points
+    ├── src/                  [shared] bandits, algorithms
+    ├── script/               [shared] running experiments (Blatt 1,2)
     ├── util/                 [shared] core utility functions
-    ├── out/                  [shared] figures, metrics, data
-    ├── doc/                  [shared] additional analysis & visualization
+    ├── out/                  [shared] figures, data
+    ├── doc/                  [shared] analysis (Blatt 3)
     │
-    ├── venv/                 [local] python virtual environment
-    ├── log/                  [local] runtime logs
-    ├── playground/           [local] unrelated python testing
-    ├── tests/                [local] standard tests.
+    ├── venv/                 [gitingored] (you create) python virtual environment
+    ├── log/                  [gitignored] (some files might create) runtime logs
     │
-    ├── .gitignore            [shared] excludes local & generated files
-    ├── requirements.txt      [shared] pinned runtime dependencies
+    ├── requirements.txt      [shared] (you install) dependencies
     ├── prompts.txt           [shared] API and coding style information for AI agents.
+    ├── .gitignore            [shared]
     ├── README.md             [shared]
+
+### Features
+
+- Instead of naively pulling one arm at a time, bandits and algorithms support bulk pulling. This greatly reduces runtime.
+  As this was noticed early, the single pull version of most algorithms where never tested or even human read.
+- [UNFINISHED] For fairness, algorithms will be tested on the same seed - For better data, seeds are randomized between runs.
+- Parameters are picked out of a coarse grid with 50 candidates via successive 1/3-ing with reduced resource allocation.
+  Reducing pull count is questionable, especially for ETC, but seems to be a non-issue.
+
+---
+
+# README - Intern
 
 ### ToDo
 
@@ -27,8 +55,6 @@
 - [DONE] Update successive halving: Remove last round, manually update winner return.
 - [DONE] Implement smart argument optimizer algorithm.
 
----
-
 ### Known Problems
 
 - [PROBLEM] Softmax is never used. I believe it should be.
@@ -38,54 +64,26 @@
 - [BUG] Boltzmann with arbitrary noise does not work. (Or is really bad.)
 - [FIXED] plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
 
----
-
 ### Human read code
 
-- Basically nothing at this point. I'll work on that. Tho most things really seem fine.
-
----
-
-# Features
-
-- Instead of naively pulling one arm at a time, bandits and algorithms support bulk pulling. This greatly reduces runtime.
-- [UNFINISHED] For fairness, algorithms will be tested on the same seed - For better data, seeds are randomized between runs.
-- Parameters are picked out of a coarse grid with 50 candidates via successive 1/3-ing with reduced resource allocation.
-  Reducing pull count is questionable, especially for ETC, but seems to be a non-issue.
-
----
-
-# Setup
-
-_Keep in mind that the commands below are for linux mint (thus ubuntu, debian). I dont know how windows works._
-
----
-
-### How to run anything.
-
-Python version: 3.10.13
-Create your own venv in the root folder CODE-Reinforcement-Learning.
-
----
-
-Once run (obviously with your path)
-
-    cd /home/felix/CODE-Reinforcement-Learning
-    source venv/bin/activate
-
-Then always run files from the root folder. For example, run ROOT/playground/hello_world.py via:
-
-    python -m playground.hello_world
-
----
+- [TODO] script/Task_1_8_graphs
+- [TODO] script/Task_1_8_naive
+- [TODO] script/Task_1_8_performance
+- [TODO] script/Task_2_5_graphs
+- [TODO] script/Task_2_5_performance
+- [TODO] src/bandits
+- [TODO] src/boltzmann
+- [TODO] src/etc
+- [TODO] src/gradient
+- [TODO] src/greedy
+- [TODO] src/ucb
+- [TODO] util/io_helpers
 
 ### Shared utilites
 
 For portability when specifying (output) files, I recommend the path relative to using
 
     from util.io_helpers import ROOT_DIR
-
----
 
 Use log() and out() from util. Both can be used with or without specifying the exact file name. Example usage below:
 
@@ -96,8 +94,6 @@ Use log() and out() from util. Both can be used with or without specifying the e
 
     out("Hello world")
     out("Hello world", "demo.txt")
-
----
 
 ### requirements.txt
 
@@ -110,8 +106,6 @@ To update your venv, then use
 
     source venv/bin/activate
     pip install -r requirements.txt
-
----
 
 # Ideal coefficients and their linspace
 
