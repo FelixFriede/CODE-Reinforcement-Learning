@@ -89,6 +89,46 @@ def plot_best_cumulative_regret_vs_n(algo_name: str, algo_index: List[Dict[str, 
     plt.savefig(os.path.join(out_dir, "best_cumulative_regret_vs_n.png"), dpi=160)
     plt.close()
 
+def plot_cumulative_regret_trajectories_for_best_at_n(
+    algo_name: str,
+    results: List[Dict[str, Any]],
+    out_dir: str,
+):
+    """
+    Plot cumulative regret over time for the tuned-best parameter at each horizon.
+    Each curve stops at its own horizon.
+    """
+    if not results:
+        return
+
+    # Sort by horizon
+    results = sorted(results, key=lambda r: int(r["n_steps"]))
+
+    plt.figure(figsize=(8, 5))
+
+    for res in results:
+        n_steps = int(res["n_steps"])
+        t = np.arange(n_steps)
+        y = res["cum_regret_mean"]
+
+        params = res.get("params", {})
+        if params and len(params) == 1:
+            k = next(iter(params.keys()))
+            v = params[k]
+            label = f"n={n_steps}, {k}={v}"
+        else:
+            label = f"n={n_steps}"
+
+        plt.plot(t, y, label=label)
+
+    plt.xlabel("t")
+    plt.ylabel("Average cumulative regret")
+    plt.title(f"{algo_name} cumulative regret comparison")
+    plt.legend(loc="upper left", fontsize=9)
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, "best_at_n_cumulative_regret_comparison.png"), dpi=160)
+    plt.close()
+
 
 def main():
     base_dir = _ensure_dir(os.path.join(OUT_DIR, "ex4_best_at_n"))
@@ -110,9 +150,20 @@ def main():
         with open(algo_index_path, "r", encoding="utf-8") as f:
             algo_index = json.load(f)
 
+        # load full saved runs
+        results: List[Dict[str, Any]] = []
+        for entry in algo_index:
+            run_dir = os.path.join(algo_dir, entry["dir"])
+            if not os.path.exists(run_dir):
+                print(f"Warning: missing run dir {run_dir}; skipping.")
+                continue
+            results.append(_load_run(run_dir))
+
         print(f"Plotting best-at-n graphs for {algo_name}")
+
         plot_best_parameter_vs_n(algo_name, algo_index, algo_dir)
         plot_best_cumulative_regret_vs_n(algo_name, algo_index, algo_dir)
+        plot_cumulative_regret_trajectories_for_best_at_n(algo_name, results, algo_dir)
 
 
 if __name__ == "__main__":

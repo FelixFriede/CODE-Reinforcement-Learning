@@ -90,7 +90,7 @@ def _algo_specs() -> List[AlgoSpec]:
             name="ETC",
             factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]),
             grid=linspace_params(6, 30, 25, key="m", cast=int),
-            plotgrid=[4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+            plotgrid=[10,12,14,16,18,20,24,26,28,30],
         ),
 
         # Greedy family
@@ -98,7 +98,7 @@ def _algo_specs() -> List[AlgoSpec]:
             name="EpsGrdy",
             factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]),
             grid=linspace_params(0.002, 0.10, 50, key="epsilon", round_to=6),
-            plotgrid=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+            plotgrid=[0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1],
         ),
         AlgoSpec(
             name="Eps0Grdy",
@@ -112,15 +112,15 @@ def _algo_specs() -> List[AlgoSpec]:
             name="UCB",
             factory=lambda b, p: UCBBulkAlgorithm(b, delta=p["delta"]),
             grid=linspace_params(0.02, 1, 50, key="delta", round_to=6),
-            plotgrid=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+            plotgrid=[0.2, 0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,],
         ),
 
         # Boltzmann family
         AlgoSpec(
             name="BltzSM",
             factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]),
-            grid=linspace_params(1, 20.00, 50, key="theta", round_to=6),
-            plotgrid=[2,4,6,8,10,12,14,16,18,20,22],
+            grid=linspace_params(1, 20.6, 50, key="theta", round_to=6),
+            plotgrid=[4,6,8,10,12,14,16,18,20,22],
         ),
 
         # Policy gradient
@@ -128,7 +128,7 @@ def _algo_specs() -> List[AlgoSpec]:
             name="PG",
             factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]),
             grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6),
-            plotgrid=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5],
+            plotgrid=[0.05, 0.15, 0.25, 0.35, 0.45, 0.55],
         ),
     ]
 
@@ -513,6 +513,6 @@ def compare_at_10000():
 
 
 if __name__ == "__main__":
-    compare_at_10000()
+    #compare_at_10000()
     plot_parameters()
-    best_at_n()
+    #best_at_n()
