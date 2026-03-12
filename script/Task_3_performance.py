@@ -251,12 +251,6 @@ def tune_parameters(
     n_steps: int,
     seed: int = 123,
 ) -> Tuple[Dict[str, Any], float]:
-    """
-    Successive 1/3-ing over the parameter grid, using n_steps as the
-    target horizon. The final score is mean cumulative regret at n_steps.
-    """
-
-    # If only one candidate (e.g. BernoulliUCB), just evaluate once.
     if len(spec.grid) == 1:
         p = spec.grid[0]
         means_r = means[: min(500, len(means))]
@@ -265,24 +259,17 @@ def tune_parameters(
         return p, score
 
     eta = 3
-    n_rounds = 3  # 50 -> 16 -> 5
+    n_rounds = 3
     candidates = list(spec.grid)
 
-    # Use increasing budgets up to the requested n_steps
-    steps_schedule = [
-        n_steps,
-        n_steps,
-        n_steps,
-    ]
-    N_schedule = [100,300,1000]
+    steps_schedule = [n_steps, n_steps, n_steps]
+    N_schedule = [100, 300, 1000]
 
-    best_params = candidates[0]
-    best_score = float("inf")
+    final_scored: List[Tuple[float, Dict[str, Any]]] = []
 
     for r in range(n_rounds):
         n_steps_r = steps_schedule[r]
         N_r = N_schedule[r]
-
         means_r = means[: min(N_r, len(means))]
 
         scored: List[Tuple[float, Dict[str, Any]]] = []
@@ -299,15 +286,14 @@ def tune_parameters(
 
         scored.sort(key=lambda x: x[0])
 
-        if scored[0][0] < best_score:
-            best_score = scored[0][0]
-            best_params = scored[0][1]
-
         if r == n_rounds - 1:
+            final_scored = scored
             break
 
         keep = max(1, len(scored) // eta)
         candidates = [p for _, p in scored[:keep]]
+
+    best_score, best_params = final_scored[0]
 
     print(
         f"Best params for {spec.name} at n={n_steps}: "
@@ -315,7 +301,6 @@ def tune_parameters(
     )
 
     return best_params, best_score
-
 # -----------------------------
 # Plotting parameter choices
 # -----------------------------

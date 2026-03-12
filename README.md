@@ -58,28 +58,6 @@ Whenever parts of the code (like some LEGACY content and some plots) are purely 
 - Parameters are picked out of a coarse grid with 50 candidates via successive 1/3-ing with reduced resource allocation.
   Reducing pull count is questionable, especially for ETC, but seems to be a non-issue.
 
-### Expected runtime
-
-On my laptop:
-
-    Intel(R) Celeron(R) N4500 @ 1.10GHz (2 Cores, 2 Threads)
-    RAM: 8 GB
-    Linux Mint 22.2
-
-    script/Task_1_8_performance: 110s (10s per 1000x10000)
-    script/Task_2_5_performance: 700s (54s per algorithm including parameter optimisation)
-
-On some cloud computer:
-
-    AMD EPYC 7513 32-Core Processor
-    RAM: 12 GB
-    Windows 10
-
-    script/Task_1_8_performance: 40s (3.6s per 1000x10000)
-    script/Task_2_5_performance: 210s (16s per algorithm including parameter optimisation)
-
----
-
 # INTERN
 
 ### ToDo
