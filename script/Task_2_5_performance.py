@@ -98,22 +98,22 @@ def _algo_specs() -> List[AlgoSpec]:
         AlgoSpec(name="ETC", factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]), grid=linspace_params(1, 50, 50, key="m", cast=int)),
         
         # Greedy family
-        AlgoSpec(name="Grdy", factory=lambda b, p: GreedyBulkAlgorithm(b), grid=[{}]),
+        #AlgoSpec(name="Grdy", factory=lambda b, p: GreedyBulkAlgorithm(b), grid=[{}]),
         AlgoSpec(name="EpsGrdy", factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]), grid=linspace_params(0.01, 0.5, 50, key="epsilon", round_to=6)),
         AlgoSpec(name="Eps0Grdy", factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]), grid=linspace_params(0.10, 50.00, 50, key="epsilon0", round_to=6)),
         
         # UCB family
-        AlgoSpec(name="UCB", factory=lambda b, p: UCBBulkAlgorithm(b, delta=p["delta"]), grid=linspace_params(0.01, 0.99, 50, key="delta", round_to=6)),
+        #AlgoSpec(name="UCB", factory=lambda b, p: UCBBulkAlgorithm(b, delta=p["delta"]), grid=linspace_params(0.01, 0.99, 50, key="delta", round_to=6)),
         AlgoSpec(name="BernoulliUCB",factory=lambda b, p: BernoulliUCBBulkAlgorithm(b),grid=[{}],),        
         ## Boltzmann family
         AlgoSpec(name="BltzSM", factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="BltzG", factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="BltzANG", factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="GumbelSB", factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]), grid=linspace_params(0.01, 0.50, 50, key="C", round_to=6)),
+        #AlgoSpec(name="BltzG", factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        #AlgoSpec(name="BltzANG", factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        #AlgoSpec(name="GumbelSB", factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]), grid=linspace_params(0.01, 0.50, 50, key="C", round_to=6)),
         
         # Policy gradient
-        AlgoSpec(name="PG", factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
-        AlgoSpec(name="PGBase", factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
+        AlgoSpec(name="PG", factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.050, 5, key="alpha", round_to=6)),
+        #AlgoSpec(name="PGBase", factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
     ]#
 
 
@@ -249,8 +249,8 @@ def tune_parameters(
     candidates = list(spec.grid) 
 
     # Hard-coded increasing budgets per round
-    steps_schedule = [1000, 3000, 10000]
-    N_schedule = [25, 50, 100]
+    steps_schedule = [10000, 10000, 10000]
+    N_schedule = [20, 40, 60]
 
     best_params = candidates[0]
     best_score = float("inf")

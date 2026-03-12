@@ -189,17 +189,17 @@ def main():
     # Select which algorithms to include (comment out any you don't want)
     SELECTED_ALGOS = [
         "ETC",
-        #"Greedy",
-        "EpsGreedyFixed",
-        "EpsGreedyDecreasing",
-        "UCB",
-        "UCBSubGaussian",
-        "BoltzmannSoftmax",
-        "BoltzmannGumbel",
-        "BoltzmannArbitraryNoise(gumbel)",
-        "GumbelScaledBonus",
-        "PolicyGradient",
-        "PolicyGradientBaseline",
+        #"Grdy",
+        "EpsGrdy",
+        "Eps0Grdy", 
+        #"UCB", 
+        "BernoulliUCB",        
+        "BltzSM", 
+        "BltzG", 
+        "BltzANG", 
+        "GumbelSB", 
+        "PG", 
+        "PGBase", 
     ]
 
     def _algo_name(r: Dict[str, Any]) -> str:

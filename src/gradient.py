@@ -8,6 +8,179 @@ import numpy as np
 # do not let classes log themselves.
 
 
+
+
+class PolicyGradientBulkAlgorithm:
+    """
+    Bulk REINFORCE / policy gradient for K-armed bandits using a softmax policy:
+
+        pi_theta(a) = exp(theta[a]) / sum_b exp(theta[b])
+
+    Update (no baseline):
+        theta <- theta + alpha * reward * grad_theta log pi_theta(a)
+
+    For softmax:
+        grad log pi(a) = e_a - pi
+    """
+
+    def __init__(self, bandit: Gang_of_Bandits, alpha: float):
+        self.bandit = bandit
+        self.alpha = float(alpha)
+
+        self.n_bandits = bandit.n_bandits
+        self.n_arms = bandit.n_arms
+
+        # Policy parameters per bandit
+        self.theta = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+        # Tracking
+        self.total_steps = 0
+        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
+        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+    def _policy_probs(self) -> np.ndarray:
+        # Numerically-stable softmax per bandit (row-wise)
+        x = self.theta - np.max(self.theta, axis=1, keepdims=True)
+        ex = np.exp(x)
+        s = np.sum(ex, axis=1, keepdims=True)
+
+        # Fallback to uniform if degenerate (rare, but mirrors naive safety)
+        bad = (~np.isfinite(s)) | (s <= 0.0)
+        probs = ex / s
+        if np.any(bad):
+            probs[bad[:, 0], :] = 1.0 / float(self.n_arms)
+            print("Bad Error")
+
+        return probs
+
+    def _select_arms(self) -> np.ndarray:
+        # Sample from softmax using the Gumbel-max trick:
+        # argmax_a (theta[a] + G_a) ~ softmax(theta)
+        g = np.random.gumbel(loc=0.0, scale=1.0, size=(self.n_bandits, self.n_arms))
+        return np.argmax(self.theta + g, axis=1).astype(np.int32)
+
+    def _update_theta(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
+        probs = self._policy_probs()  # (B, K)
+        grad = -probs                 # (B, K)
+
+        rows = np.arange(self.n_bandits)
+        grad[rows, chosen_arms] += 1.0
+
+        # theta <- theta + alpha * reward * grad
+        self.theta = self.theta + (self.alpha * rewards)[:, None] * grad
+
+    def step(self):
+        """
+        Perform ONE synchronized bulk step.
+
+        Returns
+        -------
+        chosen_arms : np.ndarray, shape (n_bandits,)
+        rewards : np.ndarray, shape (n_bandits,)
+        """
+        chosen_arms = self._select_arms()
+        rewards = self.bandit.bulk_pull(chosen_arms)
+
+        # Update stats (vectorized gather/scatter)
+        rows = np.arange(self.n_bandits)
+        self.arm_pull_counts[rows, chosen_arms] += 1
+        self.arm_reward_sums[rows, chosen_arms] += rewards
+
+        # Policy gradient update
+        self._update_theta(chosen_arms, rewards)
+
+        self.total_steps += 1
+        return chosen_arms, rewards
+
+
+# [LEGACY]
+class PolicyGradientBaselineBulkAlgorithm:
+    """
+    Bulk REINFORCE with a baseline (variance reduction), still unbiased:
+
+        theta <- theta + alpha * (reward - b_t) * grad log pi_theta(a)
+
+    Baseline is a running average reward PER bandit:
+        b_t[b] = (1/t) * sum_{s<=t} reward_s[b]
+    """
+
+    def __init__(self, bandit: Gang_of_Bandits, alpha: float):
+        self.bandit = bandit
+        self.alpha = float(alpha)
+
+        self.n_bandits = bandit.n_bandits
+        self.n_arms = bandit.n_arms
+
+        # Policy parameters per bandit
+        self.theta = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+        # Tracking
+        self.total_steps = 0
+        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
+        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+        # Baseline tracking per bandit
+        self.baseline = np.zeros(self.n_bandits, dtype=np.float64)
+        self.total_reward_sum = np.zeros(self.n_bandits, dtype=np.float64)
+
+    def _policy_probs(self) -> np.ndarray:
+        x = self.theta - np.max(self.theta, axis=1, keepdims=True)
+        ex = np.exp(x)
+        s = np.sum(ex, axis=1, keepdims=True)
+
+        bad = (~np.isfinite(s)) | (s <= 0.0)
+        probs = ex / s
+        if np.any(bad):
+            probs[bad[:, 0], :] = 1.0 / float(self.n_arms)
+
+        return probs
+
+    def _select_arms(self) -> np.ndarray:
+        # Gumbel-max sampling from softmax policy
+        g = np.random.gumbel(loc=0.0, scale=1.0, size=(self.n_bandits, self.n_arms))
+        return np.argmax(self.theta + g, axis=1).astype(np.int32)
+
+    def _update_baseline(self, rewards: np.ndarray) -> None:
+        # Running average baseline per bandit
+        self.total_reward_sum += rewards
+        t = self.total_steps + 1  # this step's index in 1..∞ (shared across bandits)
+        self.baseline = self.total_reward_sum / float(t)
+
+    def _update_theta(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
+        probs = self._policy_probs()
+        grad = -probs
+
+        rows = np.arange(self.n_bandits)
+        grad[rows, chosen_arms] += 1.0
+
+        advantage = rewards - self.baseline
+        self.theta = self.theta + (self.alpha * advantage)[:, None] * grad
+
+    def step(self):
+        """
+        Perform ONE synchronized bulk step.
+
+        Returns
+        -------
+        chosen_arms : np.ndarray, shape (n_bandits,)
+        rewards : np.ndarray, shape (n_bandits,)
+        """
+        chosen_arms = self._select_arms()
+        rewards = self.bandit.bulk_pull(chosen_arms)
+
+        rows = np.arange(self.n_bandits)
+        self.arm_pull_counts[rows, chosen_arms] += 1
+        self.arm_reward_sums[rows, chosen_arms] += rewards
+
+        # Baseline then policy update (matches naive order)
+        self._update_baseline(rewards)
+        self._update_theta(chosen_arms, rewards)
+
+        self.total_steps += 1
+        return chosen_arms, rewards
+    
+
+# [LEGACY]
 class PolicyGradientAlgorithm:
     """
     REINFORCE / policy gradient for K-armed bandits using a softmax policy:
@@ -98,6 +271,7 @@ class PolicyGradientAlgorithm:
         return chosen_arm, reward
 
 
+# [LEGACY]
 class PolicyGradientBaselineAlgorithm:
     """
     REINFORCE with a baseline (variance reduction), still unbiased:
@@ -194,170 +368,3 @@ class PolicyGradientBaselineAlgorithm:
 
         return chosen_arm, reward
     
-
-class PolicyGradientBulkAlgorithm:
-    """
-    Bulk REINFORCE / policy gradient for K-armed bandits using a softmax policy:
-
-        pi_theta(a) = exp(theta[a]) / sum_b exp(theta[b])
-
-    Update (no baseline):
-        theta <- theta + alpha * reward * grad_theta log pi_theta(a)
-
-    For softmax:
-        grad log pi(a) = e_a - pi
-    """
-
-    def __init__(self, bandit: Gang_of_Bandits, alpha: float):
-        self.bandit = bandit
-        self.alpha = float(alpha)
-
-        self.n_bandits = bandit.n_bandits
-        self.n_arms = bandit.n_arms
-
-        # Policy parameters per bandit
-        self.theta = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
-
-        # Tracking
-        self.total_steps = 0
-        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
-        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
-
-    def _policy_probs(self) -> np.ndarray:
-        # Numerically-stable softmax per bandit (row-wise)
-        x = self.theta - np.max(self.theta, axis=1, keepdims=True)
-        ex = np.exp(x)
-        s = np.sum(ex, axis=1, keepdims=True)
-
-        # Fallback to uniform if degenerate (rare, but mirrors naive safety)
-        bad = (~np.isfinite(s)) | (s <= 0.0)
-        probs = ex / s
-        if np.any(bad):
-            probs[bad[:, 0], :] = 1.0 / float(self.n_arms)
-
-        return probs
-
-    def _select_arms(self) -> np.ndarray:
-        # Sample from softmax using the Gumbel-max trick:
-        # argmax_a (theta[a] + G_a) ~ softmax(theta)
-        g = np.random.gumbel(loc=0.0, scale=1.0, size=(self.n_bandits, self.n_arms))
-        return np.argmax(self.theta + g, axis=1).astype(np.int32)
-
-    def _update_theta(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
-        probs = self._policy_probs()  # (B, K)
-        grad = -probs                 # (B, K)
-
-        rows = np.arange(self.n_bandits)
-        grad[rows, chosen_arms] += 1.0
-
-        # theta <- theta + alpha * reward * grad
-        self.theta = self.theta + (self.alpha * rewards)[:, None] * grad
-
-    def step(self):
-        """
-        Perform ONE synchronized bulk step.
-
-        Returns
-        -------
-        chosen_arms : np.ndarray, shape (n_bandits,)
-        rewards : np.ndarray, shape (n_bandits,)
-        """
-        chosen_arms = self._select_arms()
-        rewards = self.bandit.bulk_pull(chosen_arms)
-
-        # Update stats (vectorized gather/scatter)
-        rows = np.arange(self.n_bandits)
-        self.arm_pull_counts[rows, chosen_arms] += 1
-        self.arm_reward_sums[rows, chosen_arms] += rewards
-
-        # Policy gradient update
-        self._update_theta(chosen_arms, rewards)
-
-        self.total_steps += 1
-        return chosen_arms, rewards
-
-
-class PolicyGradientBaselineBulkAlgorithm:
-    """
-    Bulk REINFORCE with a baseline (variance reduction), still unbiased:
-
-        theta <- theta + alpha * (reward - b_t) * grad log pi_theta(a)
-
-    Baseline is a running average reward PER bandit:
-        b_t[b] = (1/t) * sum_{s<=t} reward_s[b]
-    """
-
-    def __init__(self, bandit: Gang_of_Bandits, alpha: float):
-        self.bandit = bandit
-        self.alpha = float(alpha)
-
-        self.n_bandits = bandit.n_bandits
-        self.n_arms = bandit.n_arms
-
-        # Policy parameters per bandit
-        self.theta = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
-
-        # Tracking
-        self.total_steps = 0
-        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
-        self.arm_reward_sums = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
-
-        # Baseline tracking per bandit
-        self.baseline = np.zeros(self.n_bandits, dtype=np.float64)
-        self.total_reward_sum = np.zeros(self.n_bandits, dtype=np.float64)
-
-    def _policy_probs(self) -> np.ndarray:
-        x = self.theta - np.max(self.theta, axis=1, keepdims=True)
-        ex = np.exp(x)
-        s = np.sum(ex, axis=1, keepdims=True)
-
-        bad = (~np.isfinite(s)) | (s <= 0.0)
-        probs = ex / s
-        if np.any(bad):
-            probs[bad[:, 0], :] = 1.0 / float(self.n_arms)
-
-        return probs
-
-    def _select_arms(self) -> np.ndarray:
-        # Gumbel-max sampling from softmax policy
-        g = np.random.gumbel(loc=0.0, scale=1.0, size=(self.n_bandits, self.n_arms))
-        return np.argmax(self.theta + g, axis=1).astype(np.int32)
-
-    def _update_baseline(self, rewards: np.ndarray) -> None:
-        # Running average baseline per bandit
-        self.total_reward_sum += rewards
-        t = self.total_steps + 1  # this step's index in 1..∞ (shared across bandits)
-        self.baseline = self.total_reward_sum / float(t)
-
-    def _update_theta(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
-        probs = self._policy_probs()
-        grad = -probs
-
-        rows = np.arange(self.n_bandits)
-        grad[rows, chosen_arms] += 1.0
-
-        advantage = rewards - self.baseline
-        self.theta = self.theta + (self.alpha * advantage)[:, None] * grad
-
-    def step(self):
-        """
-        Perform ONE synchronized bulk step.
-
-        Returns
-        -------
-        chosen_arms : np.ndarray, shape (n_bandits,)
-        rewards : np.ndarray, shape (n_bandits,)
-        """
-        chosen_arms = self._select_arms()
-        rewards = self.bandit.bulk_pull(chosen_arms)
-
-        rows = np.arange(self.n_bandits)
-        self.arm_pull_counts[rows, chosen_arms] += 1
-        self.arm_reward_sums[rows, chosen_arms] += rewards
-
-        # Baseline then policy update (matches naive order)
-        self._update_baseline(rewards)
-        self._update_theta(chosen_arms, rewards)
-
-        self.total_steps += 1
-        return chosen_arms, rewards

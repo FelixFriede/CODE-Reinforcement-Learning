@@ -43,11 +43,11 @@ Whenever parts of the code (like some LEGACY content and some plots) are purely 
     - [CORE] script/Task_2_5_graphs
     - [TODO] script/Task_2_5_performance
     - [CORE] src/bandits                    [CORE] Gang_of_Bandits, [LEGACY] Bandit
-    - [TODO] src/boltzmann
     - [CORE] src/etc                        [CORE] ETCBulkAlgorithm, [LEGACY] ETCAlgorithm
+    - [CORE] src/greedy                     [CORE] GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm, [LEGACY] GreedyAlgorithm, EpsilonGreedyFixedAlgorithm, EpsilonGreedyDecreasingAlgorithm
+    - [CORE] src/ucb                        [CORE] UCBlkAlgorithm, UCBSubGaussianBulkAlgorithm, [LEGACY] UCBAlgorithm, UCBSubGaussianAlgorithm
+    - [TODO] src/boltzmann
     - [TODO] src/gradient
-    - [TODO] src/greedy                     [CORE] GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm, [LEGACY] GreedyAlgorithm, EpsilonGreedyFixedAlgorithm, EpsilonGreedyDecreasingAlgorithm
-    - [TODO] src/ucb
 
 ### Features
 
