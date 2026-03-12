@@ -64,22 +64,29 @@ def plot_best_parameter_vs_n(algo_name: str, algo_index: List[Dict[str, Any]], o
     plt.close()
 
 
-def plot_best_final_regret_vs_n(algo_name: str, algo_index: List[Dict[str, Any]], out_dir: str):
+def plot_best_cumulative_regret_vs_n(algo_name: str, algo_index: List[Dict[str, Any]], out_dir: str):
     if not algo_index:
         return
 
     algo_index = sorted(algo_index, key=lambda x: x["n_steps"])
     xs = [entry["n_steps"] for entry in algo_index]
-    ys = [float(entry["mean_final_regret"]) for entry in algo_index]
+
+    ys = []
+    for entry in algo_index:
+        if "mean_cumulative_regret" in entry:
+            ys.append(float(entry["mean_cumulative_regret"]))
+        else:
+            # backward-compatible fallback for older saved data
+            ys.append(float(entry["mean_final_regret"]))
 
     plt.figure(figsize=(6.5, 4.5))
     plt.plot(xs, ys, marker="o")
     plt.xticks(xs)
     plt.xlabel("Pull count n")
-    plt.ylabel("Mean final cumulative regret")
-    plt.title(f"{algo_name}: regret of tuned parameter vs pull count")
+    plt.ylabel("Mean cumulative regret at n")
+    plt.title(f"{algo_name}: tuned cumulative regret vs pull count")
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "best_regret_vs_n.png"), dpi=160)
+    plt.savefig(os.path.join(out_dir, "best_cumulative_regret_vs_n.png"), dpi=160)
     plt.close()
 
 
@@ -105,7 +112,7 @@ def main():
 
         print(f"Plotting best-at-n graphs for {algo_name}")
         plot_best_parameter_vs_n(algo_name, algo_index, algo_dir)
-        plot_best_final_regret_vs_n(algo_name, algo_index, algo_dir)
+        plot_best_cumulative_regret_vs_n(algo_name, algo_index, algo_dir)
 
 
 if __name__ == "__main__":

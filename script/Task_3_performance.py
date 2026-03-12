@@ -15,10 +15,10 @@ from src.bandits import Gang_of_Bandits
 
 # bulk algorithms
 from src.etc import ETCBulkAlgorithm
-from src.greedy import GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm
-from src.ucb import UCBBulkAlgorithm, BernoulliUCBBulkAlgorithm
-from src.boltzmann import BoltzmannExplorationBulkAlgorithm, BoltzmannGumbelTrickBulkAlgorithm, BoltzmannArbitraryNoiseBulkAlgorithm, GumbelScaledBonusBulkAlgorithm
-from src.gradient import PolicyGradientBulkAlgorithm, PolicyGradientBaselineBulkAlgorithm
+from src.greedy import EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm
+from src.ucb import UCBBulkAlgorithm
+from src.boltzmann import BoltzmannExplorationBulkAlgorithm
+from src.gradient import PolicyGradientBulkAlgorithm
 
 # global utilities
 from util.io_helpers import OUT_DIR, _ensure_dir
@@ -89,7 +89,7 @@ def _algo_specs() -> List[AlgoSpec]:
         AlgoSpec(
             name="ETC",
             factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]),
-            grid=linspace_params(1, 50, 50, key="m", cast=int),
+            grid=linspace_params(6, 30, 25, key="m", cast=int),
             plotgrid=[4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
         ),
 
@@ -97,30 +97,30 @@ def _algo_specs() -> List[AlgoSpec]:
         AlgoSpec(
             name="EpsGrdy",
             factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]),
-            grid=linspace_params(0.01, 0.50, 50, key="epsilon", round_to=6),
-            plotgrid=[0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1, 0.1125, 0.125, 0.1375],
+            grid=linspace_params(0.002, 0.10, 50, key="epsilon", round_to=6),
+            plotgrid=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
         ),
         AlgoSpec(
             name="Eps0Grdy",
             factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]),
             grid=linspace_params(1, 50, 50, key="epsilon0", round_to=6),
-            plotgrid=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
+            plotgrid=[4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
         ),
 
         # UCB family
         AlgoSpec(
             name="UCB",
             factory=lambda b, p: UCBBulkAlgorithm(b, delta=p["delta"]),
-            grid=linspace_params(0.01, 0.50, 50, key="delta", round_to=6),
-            plotgrid=[0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50],
+            grid=linspace_params(0.02, 1, 50, key="delta", round_to=6),
+            plotgrid=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
         ),
 
         # Boltzmann family
         AlgoSpec(
             name="BltzSM",
             factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]),
-            grid=linspace_params(1, 50.00, 50, key="theta", round_to=6),
-            plotgrid=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
+            grid=linspace_params(1, 20.00, 50, key="theta", round_to=6),
+            plotgrid=[2,4,6,8,10,12,14,16,18,20,22],
         ),
 
         # Policy gradient
@@ -274,7 +274,7 @@ def tune_parameters(
         n_steps,
         n_steps,
     ]
-    N_schedule = [20, 40, 60]
+    N_schedule = [100,300,1000]
 
     best_params = candidates[0]
     best_score = float("inf")
@@ -450,11 +450,14 @@ def best_at_n():
             os.makedirs(run_dir, exist_ok=True)
             _save_run(run_dir, res)
 
+            mean_cum_regret = float(res["cum_regret_mean"][-1])
+            mean_regret_per_pull = mean_cum_regret / float(n_steps)
+
             entry = {
                 "n_steps": n_steps,
                 "best_params": best_params,
                 "tune_score": float(tune_score),
-                "mean_final_regret": float(res["cum_regret_mean"][-1]),
+                "mean_cumulative_regret": float(res["cum_regret_mean"][-1]),
                 "dir": f"n_{n_steps}",
             }
             algo_index.append(entry)
