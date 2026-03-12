@@ -30,11 +30,13 @@ def plot_regret_with_ci(results: List[Dict[str, Any]], out_dir: str, kind: str =
     kind: "cum" or "inst"
     """
     _ensure_dir(out_dir)
+
     n_steps = results[0]["n_steps"]
     N = results[0]["N"]
     t = np.arange(n_steps)
 
-    plt.figure()
+    fig, ax = plt.subplots(figsize=(8, 5))
+
     for r in results:
         if kind == "cum":
             mean = r["cum_regret_mean"]
@@ -50,13 +52,27 @@ def plot_regret_with_ci(results: List[Dict[str, Any]], out_dir: str, kind: str =
             fname = "regret_instant_ci.png"
 
         ci = _ci95_from_var(var, N)
-        plt.plot(t, mean, label=f"{r['name']} {r['params']}")
-        plt.fill_between(t, mean - ci, mean + ci, alpha=0.15)
+        label = f"{r['name']} {r['params']}"
 
-    plt.xlabel("t")
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.legend(ncol=2, fontsize=8)
+        ax.plot(t, mean, label=label)
+        ax.fill_between(t, mean - ci, mean + ci, alpha=0.15)
+
+    ax.set_xlabel("t")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    # legend outside, single column
+    ax.legend(
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1),
+        borderaxespad=0,
+        ncol=1,
+        fontsize=9
+    )
+
+    # reserve space on the right for legend
+    plt.subplots_adjust(right=0.72)
+
     plt.savefig(os.path.join(out_dir, fname), dpi=160)
     plt.close()
 
@@ -173,7 +189,7 @@ def main():
     # Select which algorithms to include (comment out any you don't want)
     SELECTED_ALGOS = [
         "ETC",
-        "Greedy",
+        #"Greedy",
         "EpsGreedyFixed",
         "EpsGreedyDecreasing",
         "UCB",

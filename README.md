@@ -46,7 +46,7 @@ Whenever parts of the code (like some LEGACY content and some plots) are purely 
     - [TODO] src/boltzmann
     - [CORE] src/etc                        [CORE] ETCBulkAlgorithm, [LEGACY] ETCAlgorithm
     - [TODO] src/gradient
-    - [TODO] src/greedy
+    - [TODO] src/greedy                     [CORE] GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm, [LEGACY] GreedyAlgorithm, EpsilonGreedyFixedAlgorithm, EpsilonGreedyDecreasingAlgorithm
     - [TODO] src/ucb
 
 ### Features
@@ -66,17 +66,17 @@ On my laptop:
     RAM: 8 GB
     Linux Mint 22.2
 
-    script/Task_1_8_performance:
-    script/Task_2_5_performance:
+    script/Task_1_8_performance: 110s (10s per 1000x10000)
+    script/Task_2_5_performance: 700s (54s per algorithm including parameter optimisation)
 
 On some cloud computer:
 
-    Intel(R) Celeron(R) N4500 @ 1.10GHz (2 Cores, 2 Threads)
-    RAM: 8 GB
-    Linux Mint 22.2
+    AMD EPYC 7513 32-Core Processor
+    RAM: 12 GB
+    Windows 10
 
-    script/Task_1_8_performance:
-    script/Task_2_5_performance:
+    script/Task_1_8_performance: 40s (3.6s per 1000x10000)
+    script/Task_2_5_performance: 210s (16s per algorithm including parameter optimisation)
 
 ---
 
@@ -85,9 +85,9 @@ On some cloud computer:
 ### ToDo
 
 - [TODO] Create flow diagram
-- [TODO] Change main such that each algorithm may be commented out individually.
 - [TODO] Create documentation of standout choices and features.
 - [TODO] Which runs share seeds for fairness? Which benefit from random seeds?
+- [DONE] Change main such that each algorithm may be commented out individually.
 - [DONE] Separate data from plots, i.e. store data separately for easier creating of nicer plots.
 - [DONE] Update successive halving: Remove last round, manually update winner return.
 - [DONE] Implement smart argument optimizer algorithm.
@@ -95,10 +95,10 @@ On some cloud computer:
 ### Known Problems
 
 - [PROBLEM] Softmax is never used. I believe it should be.
-- [PROBLEM/BUG] For some algorithms the parameter edge case is optimal. See below. Change parameter range. May be a bug.
-- [BUG] The curated plots do not work.
 - [BUG] Tune mean regret and final regret are (for some algorithms) very different. This is likely because the mean is being calculated over an mostly empty array, since only small gangs are part of the trials.
 - [BUG] Boltzmann with arbitrary noise does not work. (Or is really bad.)
+- [FIXED] The curated plots do not work.
+- [FIXED] Subgaussian UCB is now better than UCB.
 - [FIXED] plotting in bulk algorithms requires arms to be in order. However, this is obviously a problem, since algorithms except ETC are usually arm order dependent.
 
 # Ideal coefficients and their linspace
@@ -107,11 +107,11 @@ On some cloud computer:
 - Greedy NONE
 - EpsGreedyFixed 0.04 (0.01-0.50)
 - EpsGreedyDecreasing 6.21 (0.01-50.00)
-- UCB 0.50 (0.01-0.50) [!]
-- UCBSubGaussian 0.35 (0.01-0.50)
+- UCB 0.85 (0.01-0.99)
+- UCBSubGaussian 0.16 (0.01-0.99) [! This is wrong. Should be 0.25]
 - BoltzmannSoftmax 0.35 (0.01-0.50)
 - BoltzmannGumbel 10.28 (0.01-50.00)
 - BoltzmannArbitraryNoise(gumbel) 8.25 (0.01-50.00)
-- GumbelScaledBonus 0.01 (0.01-50.00) [!]
+- GumbelScaledBonus 0.01 (0.01-50.00) [! Edge Case]
 - PolicyGradient 0.33 (0.01-0.50)
 - PolicyGradientBaseline 0.45 (0.01-0.50)

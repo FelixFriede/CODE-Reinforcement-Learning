@@ -16,7 +16,7 @@ from src.bandits import Gang_of_Bandits
 # bulk algorithms
 from src.etc import ETCBulkAlgorithm
 from src.greedy import GreedyBulkAlgorithm, EpsilonGreedyFixedBulkAlgorithm, EpsilonGreedyDecreasingBulkAlgorithm
-from src.ucb import UCBulkAlgorithm, UCBSubGaussianBulkAlgorithm
+from src.ucb import UCBBulkAlgorithm, BernoulliUCBBulkAlgorithm
 from src.boltzmann import BoltzmannExplorationBulkAlgorithm, BoltzmannGumbelTrickBulkAlgorithm, BoltzmannArbitraryNoiseBulkAlgorithm, GumbelScaledBonusBulkAlgorithm
 from src.gradient import PolicyGradientBulkAlgorithm, PolicyGradientBaselineBulkAlgorithm
 
@@ -98,24 +98,23 @@ def _algo_specs() -> List[AlgoSpec]:
         AlgoSpec(name="ETC", factory=lambda b, p: ETCBulkAlgorithm(b, exploration_rounds=p["m"]), grid=linspace_params(1, 50, 50, key="m", cast=int)),
         
         # Greedy family
-        AlgoSpec(name="Greedy", factory=lambda b, p: GreedyBulkAlgorithm(b), grid=[{}]),
-        AlgoSpec(name="EpsGreedyFixed", factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]), grid=linspace_params(0.01, 0.5, 50, key="epsilon", round_to=6)),
-        AlgoSpec(name="EpsGreedyDecreasing", factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]), grid=linspace_params(0.10, 50.00, 50, key="epsilon0", round_to=6)),
+        AlgoSpec(name="Grdy", factory=lambda b, p: GreedyBulkAlgorithm(b), grid=[{}]),
+        AlgoSpec(name="EpsGrdy", factory=lambda b, p: EpsilonGreedyFixedBulkAlgorithm(b, epsilon=p["epsilon"]), grid=linspace_params(0.01, 0.5, 50, key="epsilon", round_to=6)),
+        AlgoSpec(name="Eps0Grdy", factory=lambda b, p: EpsilonGreedyDecreasingBulkAlgorithm(b, epsilon0=p["epsilon0"]), grid=linspace_params(0.10, 50.00, 50, key="epsilon0", round_to=6)),
         
         # UCB family
-        AlgoSpec(name="UCB", factory=lambda b, p: UCBulkAlgorithm(b, delta=p["delta"]), grid=linspace_params(0.01, 0.5, 50, key="delta", round_to=6)),
-        AlgoSpec(name="UCBSubGaussian", factory=lambda b, p: UCBSubGaussianBulkAlgorithm(b, delta=p["delta"], sigma=0.5), grid=linspace_params(0.01, 0.5, 50, key="delta", round_to=6)),
-        
-        # Boltzmann family
-        AlgoSpec(name="BoltzmannSoftmax", factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="BoltzmannGumbel", factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="BoltzmannArbitraryNoise(gumbel)", factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
-        AlgoSpec(name="GumbelScaledBonus", factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]), grid=linspace_params(0.01, 0.50, 50, key="C", round_to=6)),
+        AlgoSpec(name="UCB", factory=lambda b, p: UCBBulkAlgorithm(b, delta=p["delta"]), grid=linspace_params(0.01, 0.99, 50, key="delta", round_to=6)),
+        AlgoSpec(name="BernoulliUCB",factory=lambda b, p: BernoulliUCBBulkAlgorithm(b),grid=[{}],),        
+        ## Boltzmann family
+        AlgoSpec(name="BltzSM", factory=lambda b, p: BoltzmannExplorationBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="BltzG", factory=lambda b, p: BoltzmannGumbelTrickBulkAlgorithm(b, theta=p["theta"]), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="BltzANG", factory=lambda b, p: BoltzmannArbitraryNoiseBulkAlgorithm(b, theta=p["theta"], noise="gumbel"), grid=linspace_params(0.10, 50.00, 50, key="theta", round_to=6)),
+        AlgoSpec(name="GumbelSB", factory=lambda b, p: GumbelScaledBonusBulkAlgorithm(b, C=p["C"]), grid=linspace_params(0.01, 0.50, 50, key="C", round_to=6)),
         
         # Policy gradient
-        AlgoSpec(name="PolicyGradient", factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
-        AlgoSpec(name="PolicyGradientBaseline", factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
-    ]
+        AlgoSpec(name="PG", factory=lambda b, p: PolicyGradientBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
+        AlgoSpec(name="PGBase", factory=lambda b, p: PolicyGradientBaselineBulkAlgorithm(b, alpha=p["alpha"]), grid=linspace_params(0.01, 0.50, 50, key="alpha", round_to=6)),
+    ]#
 
 
 # -----------------------------

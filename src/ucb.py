@@ -1,4 +1,6 @@
 # src/ucb.py
+# [CORE] UCBlkAlgorithm, UCBSubGaussianBulkAlgorithm
+# [LEGACY] UCBAlgorithm, UCBSubGaussianAlgorithm
 
 from __future__ import annotations
 from src.bandits import Bandit, Gang_of_Bandits
@@ -8,6 +10,160 @@ import numpy as np
 # do not let classes log themselves.
 
 
+class UCBBulkAlgorithm:
+    """
+    Bulk UCB for bounded rewards (e.g., [0,1]):
+
+        UCB_a(t) = Q_hat[a] + sqrt( (2 * ln(1/delta)) / T_a )
+
+    For T_a = 0, we force exploration by setting UCB to +inf.
+    Runs over many bandits at once (Gang_of_Bandits).
+    """
+
+    def __init__(self, bandit: Gang_of_Bandits, delta: float):
+        self.bandit = bandit
+        self.delta = float(delta)
+
+        self.n_bandits = bandit.n_bandits
+        self.n_arms = bandit.n_arms
+
+        self.total_steps = 0
+
+        # Vectorized tracking state
+        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
+        self.arm_value_estimates = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)  # Q_hat
+
+        # Precompute constant factor
+        self._log_term = float(np.log(1.0 / self.delta))
+
+    def _select_arms(self) -> np.ndarray:
+        # Compute UCB values for all bandits/arms.
+        pulls = self.arm_pull_counts.astype(np.float64)  # (B, K)
+        q_hat = self.arm_value_estimates                 # (B, K)
+
+        # bonus = sqrt((2*log(1/delta)) / pulls) for pulls>0, else inf
+        ucb = np.empty_like(q_hat)
+
+        mask = pulls > 0.0
+        ucb[mask] = q_hat[mask] + np.sqrt((2.0 * self._log_term) / pulls[mask])
+        ucb[~mask] = np.inf
+
+        # Per-bandit argmax (ties go to first occurrence, like Python list.index(max(...))).
+        return np.argmax(ucb, axis=1).astype(np.int32)
+
+    def _update_estimates(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
+        rows = np.arange(self.n_bandits)
+
+        # Increment counts
+        self.arm_pull_counts[rows, chosen_arms] += 1
+        pulls = self.arm_pull_counts[rows, chosen_arms].astype(np.float64)
+
+        # Incremental mean update:
+        # Q <- Q + (1/pulls) * (reward - Q)
+        q_old = self.arm_value_estimates[rows, chosen_arms]
+        self.arm_value_estimates[rows, chosen_arms] = q_old + (rewards - q_old) / pulls
+
+    def step(self):
+        """
+        Perform ONE synchronized bulk step.
+
+        Returns
+        -------
+        chosen_arms : np.ndarray, shape (n_bandits,)
+        rewards : np.ndarray, shape (n_bandits,)
+        """
+        chosen_arms = self._select_arms()
+        rewards = self.bandit.bulk_pull(chosen_arms)
+
+        self._update_estimates(chosen_arms, rewards)
+        self.total_steps += 1
+
+        return chosen_arms, rewards
+
+
+# sigma = 0.25 is assumed.
+class BernoulliUCBBulkAlgorithm:
+    """
+    Bulk UCB for Bernoulli rewards with fixed script-chosen constants.
+
+    This implementation intentionally follows the script's Bernoulli choice
+    and hard-codes:
+
+        sigma = 0.25
+        n = 10000
+
+    So the exploration bonus is
+
+        UCB_a(t) = Q_hat[a] + sqrt((4 * sigma^2 * log(n)) / T_a)
+
+    which here becomes
+
+        UCB_a(t) = Q_hat[a] + sqrt((0.25 * log(10000)) / T_a)
+
+    For T_a = 0, we force exploration by setting UCB to +inf.
+    Runs over many bandits at once (Gang_of_Bandits).
+    """
+
+    def __init__(self, bandit: Gang_of_Bandits):
+        self.bandit = bandit
+
+        self.n_bandits = bandit.n_bandits
+        self.n_arms = bandit.n_arms
+
+        self.total_steps = 0
+
+        # Hard-coded per script request
+        self.n = 10000
+        self.sigma = 0.25
+
+        # Vectorized tracking state
+        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
+        self.arm_value_estimates = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)
+
+        # Precompute constant factor
+        self._log_term = float(np.log(self.n))
+        self._bonus_scale = 4.0 * (self.sigma ** 2)  # = 0.25
+
+    def _select_arms(self) -> np.ndarray:
+        pulls = self.arm_pull_counts.astype(np.float64)
+        q_hat = self.arm_value_estimates
+
+        ucb = np.empty_like(q_hat)
+
+        mask = pulls > 0.0
+        ucb[mask] = q_hat[mask] + np.sqrt((self._bonus_scale * self._log_term) / pulls[mask])
+        ucb[~mask] = np.inf
+
+        return np.argmax(ucb, axis=1).astype(np.int32)
+
+    def _update_estimates(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
+        rows = np.arange(self.n_bandits)
+
+        self.arm_pull_counts[rows, chosen_arms] += 1
+        pulls = self.arm_pull_counts[rows, chosen_arms].astype(np.float64)
+
+        q_old = self.arm_value_estimates[rows, chosen_arms]
+        self.arm_value_estimates[rows, chosen_arms] = q_old + (rewards - q_old) / pulls
+
+    def step(self):
+        """
+        Perform ONE synchronized bulk step.
+
+        Returns
+        -------
+        chosen_arms : np.ndarray, shape (n_bandits,)
+        rewards : np.ndarray, shape (n_bandits,)
+        """
+        chosen_arms = self._select_arms()
+        rewards = self.bandit.bulk_pull(chosen_arms)
+
+        self._update_estimates(chosen_arms, rewards)
+        self.total_steps += 1
+
+        return chosen_arms, rewards
+      
+
+# [LEGACY]
 class UCBAlgorithm:
     """
     UCB as typically presented for bounded rewards (e.g., [0,1]) in many lectures:
@@ -89,6 +245,7 @@ class UCBAlgorithm:
         return chosen_arm, reward
 
 
+# [LEGACY]
 class UCBSubGaussianAlgorithm:
     """
     UCB adapted to sigma-subgaussian rewards:
@@ -169,127 +326,3 @@ class UCBSubGaussianAlgorithm:
         return chosen_arm, reward
     
 
-class UCBulkAlgorithm:
-    """
-    Bulk UCB for bounded rewards (e.g., [0,1]):
-
-        UCB_a(t) = Q_hat[a] + sqrt( (2 * ln(1/delta)) / T_a )
-
-    For T_a = 0, we force exploration by setting UCB to +inf.
-    Runs over many bandits at once (Gang_of_Bandits).
-    """
-
-    def __init__(self, bandit: Gang_of_Bandits, delta: float):
-        self.bandit = bandit
-        self.delta = float(delta)
-
-        self.n_bandits = bandit.n_bandits
-        self.n_arms = bandit.n_arms
-
-        self.total_steps = 0
-
-        # Vectorized tracking state
-        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
-        self.arm_value_estimates = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)  # Q_hat
-
-        # Precompute constant factor
-        self._log_term = float(np.log(1.0 / self.delta))
-
-    def _select_arms(self) -> np.ndarray:
-        # Compute UCB values for all bandits/arms.
-        pulls = self.arm_pull_counts.astype(np.float64)  # (B, K)
-        q_hat = self.arm_value_estimates                 # (B, K)
-
-        # bonus = sqrt((2*log(1/delta)) / pulls) for pulls>0, else inf
-        ucb = np.empty_like(q_hat)
-
-        mask = pulls > 0.0
-        ucb[mask] = q_hat[mask] + np.sqrt((2.0 * self._log_term) / pulls[mask])
-        ucb[~mask] = np.inf
-
-        # Per-bandit argmax (ties go to first occurrence, like Python list.index(max(...))).
-        return np.argmax(ucb, axis=1).astype(np.int32)
-
-    def _update_estimates(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
-        rows = np.arange(self.n_bandits)
-
-        # Increment counts
-        self.arm_pull_counts[rows, chosen_arms] += 1
-        pulls = self.arm_pull_counts[rows, chosen_arms].astype(np.float64)
-
-        # Incremental mean update:
-        # Q <- Q + (1/pulls) * (reward - Q)
-        q_old = self.arm_value_estimates[rows, chosen_arms]
-        self.arm_value_estimates[rows, chosen_arms] = q_old + (rewards - q_old) / pulls
-
-    def step(self):
-        """
-        Perform ONE synchronized bulk step.
-
-        Returns
-        -------
-        chosen_arms : np.ndarray, shape (n_bandits,)
-        rewards : np.ndarray, shape (n_bandits,)
-        """
-        chosen_arms = self._select_arms()
-        rewards = self.bandit.bulk_pull(chosen_arms)
-
-        self._update_estimates(chosen_arms, rewards)
-        self.total_steps += 1
-
-        return chosen_arms, rewards
-
-
-class UCBSubGaussianBulkAlgorithm:
-    """
-    Bulk UCB for sigma-subgaussian rewards:
-
-        UCB_a(t) = Q_hat[a] + sigma * sqrt( (2 * ln(1/delta)) / T_a )
-
-    For T_a = 0, we force exploration by setting UCB to +inf.
-    """
-
-    def __init__(self, bandit: Gang_of_Bandits, delta: float, sigma: float):
-        self.bandit = bandit
-        self.delta = float(delta)
-        self.sigma = float(sigma)
-
-        self.n_bandits = bandit.n_bandits
-        self.n_arms = bandit.n_arms
-
-        self.total_steps = 0
-
-        self.arm_pull_counts = np.zeros((self.n_bandits, self.n_arms), dtype=np.int32)
-        self.arm_value_estimates = np.zeros((self.n_bandits, self.n_arms), dtype=np.float64)  # Q_hat
-
-        self._log_term = float(np.log(1.0 / self.delta))
-
-    def _select_arms(self) -> np.ndarray:
-        pulls = self.arm_pull_counts.astype(np.float64)  # (B, K)
-        q_hat = self.arm_value_estimates                 # (B, K)
-
-        ucb = np.empty_like(q_hat)
-
-        mask = pulls > 0.0
-        ucb[mask] = q_hat[mask] + self.sigma * np.sqrt((2.0 * self._log_term) / pulls[mask])
-        ucb[~mask] = np.inf
-
-        return np.argmax(ucb, axis=1).astype(np.int32)
-
-    def _update_estimates(self, chosen_arms: np.ndarray, rewards: np.ndarray) -> None:
-        rows = np.arange(self.n_bandits)
-
-        self.arm_pull_counts[rows, chosen_arms] += 1
-        pulls = self.arm_pull_counts[rows, chosen_arms].astype(np.float64)
-
-        q_old = self.arm_value_estimates[rows, chosen_arms]
-        self.arm_value_estimates[rows, chosen_arms] = q_old + (rewards - q_old) / pulls
-
-    def step(self):
-        chosen_arms = self._select_arms()
-        rewards = self.bandit.bulk_pull(chosen_arms)
-
-        self._update_estimates(chosen_arms, rewards)
-        self.total_steps += 1
-
-        return chosen_arms, rewards
