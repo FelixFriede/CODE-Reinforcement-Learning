@@ -150,10 +150,15 @@ def run_bulk_experiment(
     Returns dict with:
       - inst_regret_mean/var (t)
       - cum_regret_mean/var (t)
+      - optimal_action_mean/var (t)
+      - cum_optimal_action_mean/var (t)
+      - optimal_action_count_per_run (N,)
+      - optimal_action_share_per_run (N,)
+      - final_estimation_mse_per_run (N,)
       - final_regret_per_run (N,)
       - true_means_ranked (N,K)
-      - est_means_ranked (N,K)  (final)
-      - play_prob_per_run_ranked (N,K)  (counts/n_steps, rank-aligned by true means)
+      - est_means_ranked_final (N,K)
+      - play_prob_ranked (N,K)
     """
     if seed is not None:
         np.random.seed(seed)
@@ -180,7 +185,13 @@ def run_bulk_experiment(
     cum_regret_mean = np.empty(n_steps, dtype=float)
     cum_regret_var = np.empty(n_steps, dtype=float)
 
+    optimal_action_mean = np.empty(n_steps, dtype=float)
+    optimal_action_var = np.empty(n_steps, dtype=float)
+    cum_optimal_action_mean = np.empty(n_steps, dtype=float)
+    cum_optimal_action_var = np.empty(n_steps, dtype=float)
+
     cum_regret_per_run = np.zeros(N, dtype=float)
+    optimal_action_count_per_run = np.zeros(N, dtype=np.int32)
 
     # counts for play probabilities over the full horizon
     play_counts = np.zeros((N, K), dtype=np.int32)
@@ -196,11 +207,16 @@ def run_bulk_experiment(
         mu_star = gang.means[rows, true_best]
         mu_chosen = gang.means[rows, chosen]
         inst_regret = mu_star - mu_chosen  # (N,)
-
         cum_regret_per_run += inst_regret
+
+        optimal_action = (chosen == true_best).astype(float)  # (N,)
+        optimal_action_count_per_run += optimal_action.astype(np.int32)
 
         inst_regret_mean[t], inst_regret_var[t] = _mean_var(inst_regret, axis=0)
         cum_regret_mean[t], cum_regret_var[t] = _mean_var(cum_regret_per_run, axis=0)
+
+        optimal_action_mean[t], optimal_action_var[t] = _mean_var(optimal_action, axis=0)
+        cum_optimal_action_mean[t], cum_optimal_action_var[t] = _mean_var(optimal_action_count_per_run, axis=0)
 
     sys.stdout.write("\r\033[K")
     sys.stdout.flush()
@@ -212,9 +228,7 @@ def run_bulk_experiment(
     elif hasattr(algo, "arm_value_estimates"):
         est = np.asarray(algo.arm_value_estimates)
     elif hasattr(algo, "theta"):
-        # policy gradient: interpret softmax(theta) as preference; not a mean estimate.
-        # For plotting "means vs estimates", we use empirical means from tracking if present;
-        # if absent, we use NaNs.
+        # policy gradient: not a mean estimate
         est = np.full((N, K), np.nan, dtype=float)
     else:
         est = np.full((N, K), np.nan, dtype=float)
@@ -224,20 +238,47 @@ def run_bulk_experiment(
     play_prob_per_run = play_counts.astype(float) / float(n_steps)
     play_prob_per_run_ranked = np.take_along_axis(play_prob_per_run, order, axis=1)
 
+    optimal_action_share_per_run = optimal_action_count_per_run.astype(float) / float(n_steps)
+
+    # final estimation MSE per run; if estimates are unavailable, return NaNs
+    if np.all(np.isfinite(est)):
+        final_estimation_mse_per_run = np.mean((est - gang.means) ** 2, axis=1)
+    else:
+        final_estimation_mse_per_run = np.full(N, np.nan, dtype=float)
+        finite_mask = np.isfinite(est)
+        row_has_any = np.any(finite_mask, axis=1)
+        if np.any(row_has_any):
+            tmp = np.full(N, np.nan, dtype=float)
+            for i in np.where(row_has_any)[0]:
+                mask = finite_mask[i]
+                tmp[i] = float(np.mean((est[i, mask] - gang.means[i, mask]) ** 2))
+            final_estimation_mse_per_run = tmp
+
     return {
         "name": spec.name,
         "params": params,
         "n_steps": n_steps,
         "N": N,
         "K": K,
+
         "true_means_ranked": true_means_ranked,              # (N,K)
         "est_means_ranked_final": est_means_ranked,          # (N,K)
         "play_prob_ranked": play_prob_per_run_ranked,        # (N,K)
+
         "inst_regret_mean": inst_regret_mean,
         "inst_regret_var": inst_regret_var,
         "cum_regret_mean": cum_regret_mean,
         "cum_regret_var": cum_regret_var,
-        "final_regret_per_run": cum_regret_per_run.copy(),   # (N,)
+
+        "optimal_action_mean": optimal_action_mean,
+        "optimal_action_var": optimal_action_var,
+        "cum_optimal_action_mean": cum_optimal_action_mean,
+        "cum_optimal_action_var": cum_optimal_action_var,
+        "optimal_action_count_per_run": optimal_action_count_per_run.copy(),
+        "optimal_action_share_per_run": optimal_action_share_per_run,
+
+        "final_estimation_mse_per_run": final_estimation_mse_per_run,
+        "final_regret_per_run": cum_regret_per_run.copy(),
     }
 
 
@@ -301,8 +342,9 @@ def tune_parameters(
     )
 
     return best_params, best_score
+
 # -----------------------------
-# Plotting parameter choices
+# Tasks
 # -----------------------------
 
 def plot_parameters():
@@ -465,10 +507,6 @@ def best_at_n():
         json.dump(top_index, f, indent=2)
 
     print("\nDone.")
-
-# -----------------
-# main
-# -----------------
 
 def compare_at_10000():
     # experiment constants
